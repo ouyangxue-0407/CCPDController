@@ -1,16 +1,43 @@
+import os
+import time
 from django.shortcuts import render, HttpResponse
 # from azure.storage.blob import BlobServiceClient
-import requests
+from pymongo import MongoClient
+from dotenv import load_dotenv
+load_dotenv()
 
-# service = BlobServiceClient(account_url="https://<my_account_name>.blob.core.windows.net", credential="<account_access_key>")
+# MongoDB
+client = MongoClient(os.getenv('DATABASE_URL'))
+db = client['CCPD']
+collection = db['Inventory']
+
+# single image download
+def downloadSingleImage(request):
+    if request.method == "GET":
+        print(request)
+        return collection.find()
+    
+# single image download
+def bulkDownloadImages(request):
+    if request.method == "GET":
+        print(request)
+        return collection.find()
 
 # single image upload
-def singleImage(request):
-
-    print(request)    
-    return HttpResponse('single image upload happens here')
+def uploadSingleImage(request):
+    if request.method == "GET":
+        print(request)
+        newDocument = {
+            "time": time.time(),
+            "sku": 11000,
+            "description": "example inventory, please do not buy",
+            "condition": "new",
+            "owner": "Michael"
+        }
+        collection.insert_one(newDocument)
+        return HttpResponse()
 
 # bulk image upload
-def bulkImage(request):
+def bulkUploadImages(request):
     print(request)
     return HttpResponse("Multiple image upload happens here")
