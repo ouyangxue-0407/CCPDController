@@ -3,19 +3,21 @@ import json
 from time import time, ctime
 from imageController.models import InventoryImage
 from django.shortcuts import render, HttpResponse
-from azure.storage.blob import BlobServiceClient, BlobClient
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from django.views.decorators.csrf import csrf_exempt
 from pymongo import MongoClient
 from dotenv import load_dotenv
 load_dotenv()
 
 # Azure Blob
-# client = BlobServiceClient(os.getenv('BLOB_KEY'),'QATeam')
+# azure_blob_client = ContainerClient(os.getenv('SAS_KEY'), 'ccpd')
+azure_blob_client = BlobServiceClient(os.getenv('SAS_KEY'))
+container = azure_blob_client.get_container_client("product-image")
 # container = client.get_container_client('product-image')
 
 # MongoDB
-client = MongoClient(os.getenv('DATABASE_URL'))
-db = client['CCPD']
+mongo_client = MongoClient(os.getenv('DATABASE_URL'))
+db = mongo_client['CCPD']
 collection = db['InventoryImage']
 
 # single image download
@@ -39,25 +41,24 @@ def downloadAllImagesBySKU(request):
         print(request)
 
 # single image upload
-@csrf_exempt
+# @csrf_exempt
 def uploadSingleImage(request):
     if request.method == 'PUT' and request.body:
         
         # decode body to python object
         body = json.loads(request.body.decode('utf-8'))
-        blob = BlobClient.from_connection_string(conn_str=os.getenv('BLOB_KEY'), container_name="product-image", blob_name=body["sku"])
-    
-        blob.upload_blob(body["images"][0])
         
-        azureImageArr = []
-        # push to azure blob
-        # container.upload_blob('')
-        # for x in body['images']:
-        #     with open (x, 'r') as file:
-        #         print(file)
-                # await container.upload_blob(file)
+        # construct the blob object
+        blob = BlobClient.from_connection_string(
+            conn_str=os.getenv('BLOB_KEY'), 
+            container_name="product-image", 
+            blob_name=body["sku"]
+        )
+    
+        # upload blob to azure
+        blob.upload_blob(body["images"][0])
 
-        # build inventory image data object
+        # construct database row object
         newInventoryImage = InventoryImage(
             time = str(ctime(time())),
             sku = body["sku"],
@@ -79,8 +80,4 @@ def bulkUploadImages(request):
 # list blob containers
 def listBlobContainers(request):
     if request.method == 'GET':
-        print('list blob container')
-        blob_list = container.list_blobs()
-        
-        # blob_service_client = BlobServiceClient(account_url=os.getenv('CONTAINER_URL'), credential=os.getenv('BLOB_KEY'))
-        return HttpResponse(blob_list)
+        return HttpResponse(container.list_blob_names())
