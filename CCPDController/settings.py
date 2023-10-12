@@ -31,6 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -71,6 +73,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
+CORS_ALLOWED_ORIGINS = [
+    "https://domain.com",
+    "https://api.domain.com",
+    "http://localhost:8100",
+    "http://127.0.0.1:8100"
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://\w+\.domain\.com$",
+]
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
