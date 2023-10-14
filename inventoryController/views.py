@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 load_dotenv()
 
 # MongoDB
-client = MongoClient(os.getenv('DATABASE_URL'))
+client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=1)
 db = client['CCPD']
 collection = db['Inventory']
 
