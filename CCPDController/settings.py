@@ -71,10 +71,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
+CORS_ORIGIN_ALLOW_ALL = True
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8100",
     "http://127.0.0.1:8100"
 ]
+
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8100",
     "http://localhost:8100"

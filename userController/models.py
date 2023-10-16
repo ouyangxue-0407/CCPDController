@@ -1,12 +1,13 @@
 from django.db import models
+from django.core.validators import MinLengthValidator
 
 class User(models.Model): 
     _id: models.AutoField(primary_key=True)
-    name: models.CharField(max_length=20)
-    email: models.EmailField(max_length=40)
-    password: models.CharField(max_length=45) # store hashed string only
-    role: models.CharField(max_length=10)
-    registrationDate: models.CharField(max_length=30)
+    name: models.CharField(max_length=20, validators=[MinLengthValidator(3, 'Need to input a longer name')])
+    email: models.EmailField(max_length=45, validators=[MinLengthValidator(8, 'Email Invalid')])
+    password: models.CharField(max_length=45, validators=[MinLengthValidator(8, 'password Invalid')])
+    role: models.CharField(max_length=15, validators=[MinLengthValidator(8, 'role Invalid')])
+    registrationDate: models.CharField(max_length=30, validators=[MinLengthValidator(8,'Registration date invalid')])
     userActive: models.BooleanField()
     
     # constructor input all info

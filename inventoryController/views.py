@@ -21,8 +21,6 @@ def createInventory(request):
         # convert body from json to object
         body = json.loads(request.body.decode('utf-8'))
         
-        print(body)
-        
         # construct new inventory
         newInventory = InventoryItem(
             time=str(ctime(time())),
@@ -40,7 +38,6 @@ def createInventory(request):
         # pymongo need dict or bson object
         res = collection.insert_one(newInventory.__dict__)
         return HttpResponse(newInventory)
-    return HttpResponse('Please use put to create inventory!')
         
 # delete inventory by sku
 def deleteInventory(request):
