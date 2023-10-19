@@ -14,7 +14,6 @@ class InventoryItem(models.Model):
     shelfLocation: models.CharField(max_length=4)
     amount: models.IntegerField(max_length=3)
     owner: models.CharField(max_length=32)
-    # images: JSONField()
     
     # constructor input all info
     def __init__(self, time, sku, itemCondition, comment, link, platform, shelfLocation, amount, owner) -> None:
