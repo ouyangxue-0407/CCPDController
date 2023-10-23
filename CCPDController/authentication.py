@@ -11,24 +11,48 @@ collection = db['User']
 
 # customized authentication class used in settings
 class JWTAuthentication(TokenAuthentication): 
-    def verifyToken(self, token):
-        try:
-            # decode
-            payload = jwt.decode(token, settings.SECRET_KEY)
-            uid = ObjectId(payload['id'])
+    def authenticate(self, request):
+        print('========================')
+        print('|| verify token called ||')
+        print('========================')
+        
+        # get auth token in request header
+        token = request.META.get('HTTP_AUTHORIZATION')
+        JWTToken = token[7:]
+        
+        print(JWTToken)
+        
+        if not JWTToken:
+            print('no tokens found')
+            return None 
 
-            print(token)
-            
-            # query mongo db for user
-            user = collection.find_one({'_id': uid})
 
-        # expect errors
-        except jwt.DecodeError:
-            raise AuthenticationFailed('Invalid token')
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Token has expired')
+        print('========================')
+        print('|| decode token called ||')
+        print('========================')
+        
+        # decode
+        payload = jwt.decode(JWTToken, settings.SECRET_KEY, algorithms='HS256')
+        print(payload)
+        
+        
+        uid = ObjectId(payload['id'])
+        print(uid)
+        
+        # query mongo db for user
+        user = collection.find_one({'_id': uid})
+        
+        print(user)
+
+        # try:
+
+        
+        # except jwt.DecodeError or UnicodeError:
+        #     raise AuthenticationFailed('Invalid token')
+        # except jwt.ExpiredSignatureError:
+        #     raise AuthenticationFailed('Token has expired')
         
         # if not activate throw error
         if not user['userActive']:
-            raise AuthenticationFailed('User inactive or deleted')
-        return payload
+            raise AuthenticationFailed('User inactive')
+        return True

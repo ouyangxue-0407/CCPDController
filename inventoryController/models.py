@@ -4,13 +4,29 @@ from typing import Any
 from jsonfield import JSONField
 
 class InventoryItem(models.Model): 
+    CONDITION_CHOISES = [
+        ('New', 'New'),
+        ('Sealed', 'Sealed'),
+        ('Used', 'Used'),
+        ('Used Like New', 'Used Like New'),
+        ('Damaged', 'Damaged'),
+        ('As Is', 'As Is'),
+    ]
+    
+    PLATFORM_CHOISES = [
+        ('Amazon', 'AMAZON'),
+        ('eBay', 'eBay'),
+        ('Official Website', 'Official Website'),
+        ('Other', 'Other')
+    ]
+    
     _id: models.AutoField(primary_key=True)
     time: models.CharField(max_length=30)
-    sku: models.CharField(max_length=10)
-    itemCondition: models.CharField(max_length=10)
+    sku: models.IntegerField(max_length=10)
+    itemCondition: models.CharField(max_length=14, choices=CONDITION_CHOISES)
     comment: models.TextField()
     link: models.TextField()
-    platform: models.CharField(max_length=10)
+    platform: models.CharField(max_length=16, choices=PLATFORM_CHOISES)
     shelfLocation: models.CharField(max_length=4)
     amount: models.IntegerField(max_length=3)
     owner: models.CharField(max_length=32)
@@ -26,7 +42,6 @@ class InventoryItem(models.Model):
         self.shelfLocation = shelfLocation
         self.amount = amount
         self.owner = owner
-        # self.images = images
         
     # return inventory sku
     def __str__(self) -> str:

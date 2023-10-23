@@ -2,11 +2,16 @@ from django.db import models
 from django.core.validators import MinLengthValidator
 
 class User(models.Model): 
+    ROLE_CHOISES = [
+        ('Admin', 'Admin'),
+        ('QAPersonal', 'QAPersonal'),
+    ]
+    
     _id: models.AutoField(primary_key=True)
-    name: models.CharField(max_length=20, validators=[MinLengthValidator(3, 'Need to input a longer name')])
+    name: models.CharField(max_length=20, validators=[MinLengthValidator(3, 'Name Invalid')])
     email: models.EmailField(max_length=45, validators=[MinLengthValidator(8, 'Email Invalid')])
-    password: models.CharField(max_length=45, validators=[MinLengthValidator(8, 'password Invalid')])
-    role: models.CharField(max_length=15, validators=[MinLengthValidator(8, 'role Invalid')])
+    password: models.CharField(max_length=45, validators=[MinLengthValidator(8, 'Password Invalid')])
+    role: models.CharField(max_length=12, validators=[MinLengthValidator(4, 'Role Invalid')], choices=ROLE_CHOISES)
     registrationDate: models.CharField(max_length=30, validators=[MinLengthValidator(8,'Registration date invalid')])
     userActive: models.BooleanField()
     
