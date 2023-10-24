@@ -28,7 +28,7 @@ collection = db['User']
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def login(request):
+async def login(request):
     body = decodeJSON(request.body)
     
     # sanitize
@@ -38,13 +38,13 @@ def login(request):
         return Response('Invalid Login Information', status=status.HTTP_400_BAD_REQUEST)
     
     # check if user exist
-    user = collection.find_one({'email': email, 'password': password})
+    user = await collection.find_one({'email': email, 'password': password})
     if user is None:
         return Response('Login Failed', status=status.HTTP_404_NOT_FOUND)
     if user['userActive'] is False:
         return Response('User Inactive', status=status.HTTP_401_UNAUTHORIZED)
     
-    # return jwt token to user
+    # construct payload
     payload = {
         'id': str(ObjectId(user['_id'])),
         'exp': datetime.utcnow() + timedelta(days=14),
@@ -58,7 +58,7 @@ def login(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def getUserById(request):
+async def getUserById(request):
     body = decodeJSON(request.body)
     
     try:
@@ -68,7 +68,7 @@ def getUserById(request):
         return Response('User ID Invalid:', status=status.HTTP_401_UNAUTHORIZED)
     
     # query db for user
-    res = collection.find_one({'_id': uid})
+    res = await collection.find_one({'_id': uid})
     if not res:
         return Response('User Not Found', status=status.HTTP_404_NOT_FOUND)
 
@@ -87,14 +87,14 @@ def getUserById(request):
 
 @csrf_exempt
 @api_view(['POST'])
-def registerUser(request):
+async def registerUser(request):
     body = decodeJSON(request.body)
         
     # check if body is valid
     checkBody(body)
     
     # check if email exist in database
-    res = collection.find_one({ 'email': body['email'] })
+    res = await collection.find_one({ 'email': body['email'] })
     
     # check for existing email
     if res:
@@ -111,7 +111,7 @@ def registerUser(request):
     )
     
     # insert user into db
-    res = collection.insert_one(newUser.__dict__)
+    res = await collection.insert_one(newUser.__dict__)
 
     # return the registration result
     if res:
@@ -121,18 +121,18 @@ def registerUser(request):
 
 # delete user by id
 @api_view(['DELETE'])
-def deleteUserById(request):
+async def deleteUserById(request):
     body = decodeJSON(request.body)
     
     # convert to BSON
     uid = ObjectId(body['_id'])
     
     # query db for user
-    res = collection.find_one({'_id': uid})
+    res = await collection.find_one({'_id': uid})
     
     # if found, delete it
     if res :
-        res = collection.delete_one({'_id': uid})
+        res = await collection.delete_one({'_id': uid})
         return HttpResponse('User Deleted')
     else:
         return HttpResponse('User Not Found')
@@ -142,14 +142,14 @@ def deleteUserById(request):
 # admin password have to be set in mongo manually
 @api_view(['PUT'])
 @csrf_exempt
-def updatePasswordById(request):
+async def updatePasswordById(request):
     body = decodeJSON(request.body)
     
     # convert to BSON
     uid = ObjectId(body['_id'])
     
     # query db for user
-    res = collection.find_one({
+    res = await collection.find_one({
         '_id': uid, 
         'role': 'QAPersonal'
     })
@@ -160,7 +160,7 @@ def updatePasswordById(request):
     
     # if found, change its pass word
     if res :
-        collection.update_one(
+        await collection.update_one(
             { '_id': uid }, 
             { '$set': {'password': body['password']} }
         )
