@@ -16,11 +16,15 @@ def get_db_client():
 
 # decode body from json to object
 decodeJSON = lambda body : json.loads(body.decode('utf-8'))\
-    
-# check if obj is type t
-def checkT(obj, t):
-    if type(obj) is not t:
-        return False
+
+# check if body contains valid user information
+def checkBody(body):
+    if len(body['name']) < 3 or len(body['name']) > 40:
+        return HttpResponse('Invalid Name')
+    elif len(body['email']) < 6 or len(body['email']) > 45 or '@' not in body['email']:
+        return HttpResponse('Invalid Email')
+    elif len(body['password']) < 8 or len(body['password']) > 45:
+        return HttpResponse('Invalid Password')
 
 # check input length
 def checkLen(input, minLen, maxLen):
@@ -38,7 +42,7 @@ def removeStr(input):
 # skuy can be from 3 chars to 40 chars
 def sanitizeSku(sku):
     # type check
-    if checkT(sku, int):
+    if not isinstance(sku, int):
         return False
     
     # len check
@@ -49,7 +53,7 @@ def sanitizeSku(sku):
 # name can be from 3 chars to 40 chars
 def sanitizeName(name):
     # type check
-    if checkT(name, str):
+    if not isinstance(name, str):
         return False
     
     # remove danger chars
@@ -63,7 +67,7 @@ def sanitizeName(name):
 # email can be from 7 chars to 40 chars
 def sanitizeEmail(email):
     # type and format check
-    if checkT(email, str) or '@' not in email:
+    if not isinstance(email, str) or '@' not in email:
         return False
     
     # len check
@@ -73,7 +77,7 @@ def sanitizeEmail(email):
 
 # password can be from 8 chars to 40 chars
 def sanitizePassword(password):
-    if checkT(password, str):
+    if not isinstance(password, str):
         return False
     if len(password) < 8 or len(password) > 40:
         return False
@@ -83,8 +87,8 @@ def sanitizePassword(password):
 def sanitizePlatform(platform):
     if platform not in ['Amazon', 'eBay', 'Official Website', 'Other']:
         return False
-    
+
 # shelf location sanitize
 def sanitizeShelfLocation(shelfLocation):
-    if type(shelfLocation) is not str:
+    if not isinstance(shelfLocation, str):
         return False

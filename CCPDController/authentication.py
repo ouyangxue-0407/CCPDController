@@ -11,47 +11,42 @@ db = get_db_client()
 collection = db['User']
 
 # customized authentication class used in settings
-class JWTAuthentication(TokenAuthentication): 
-    
-    keyword = 'Bearer'
-    model = User
-    
+class JWTAuthentication(TokenAuthentication):
     # run query against database to verify user info by querying user id
-    async def authenticate_credentials(self, id):
-        
-        # query mongo db for user
+    def authenticate_credentials(self, id):
+        # if id cannot convert into ObjectId, throw error
         try:
             uid = ObjectId(id)
         except:
             raise AuthenticationFailed('Invalid ID')
-        user = await collection.find_one({'_id': uid})
-        print(user)
+        
+        # get only id status and role
+        user = collection.find_one({'_id': uid}, {'userActive': 1, 'role': 1})
+        
+        # check user activation status
         if not user['userActive']:
             raise AuthenticationFailed('User Inactive')
-        return (user, None)
+        
+        # return type have to be tuple
+        return (user, user['role'])
         
     # called everytime when accessing restricted router
     def authenticate(self, request):
-        print('========================')
-        print('|| verify token called ||')
-        print('========================')
-        # get auth token in request header and concat
-        token = request.META.get('HTTP_AUTHORIZATION')
-        JWTToken = token[7:]
-        print(JWTToken)
-        
-        if not JWTToken:
-            print('no tokens found')
-            raise AuthenticationFailed('Token Not Found')
+        try:
+            # get auth token in request header and concat
+            token = request.META.get('HTTP_AUTHORIZATION')
+            
+            # remove space and auth type
+            JWTToken = token[7:]
+            
+            # if no token throw not found
+            if not JWTToken or len(JWTToken) < 1:
+                raise AuthenticationFailed('Token Not Found')
 
-        # decode
-        payload = jwt.decode(JWTToken, settings.SECRET_KEY, algorithms='HS256')
-        print(payload)
-        
-        # try:
-        
-        # except jwt.DecodeError or UnicodeError:
-        #     raise AuthenticationFailed('Invalid token')
-        # except jwt.ExpiredSignatureError:
-        #     raise AuthenticationFailed('Token has expired')
+            # decode jwt and retrive user id
+            payload = jwt.decode(JWTToken, settings.SECRET_KEY, algorithms='HS256')
+        except jwt.DecodeError or UnicodeError:
+            raise AuthenticationFailed('Invalid token')
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed('Token has expired')
         return self.authenticate_credentials(payload['id'])

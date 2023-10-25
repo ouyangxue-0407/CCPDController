@@ -80,6 +80,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 # Django rest framework
 REST_FRAMEWORK = {
+    # default auth class for all routes
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'CCPDController.authentication.JWTAuthentication',
     ]

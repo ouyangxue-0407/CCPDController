@@ -5,22 +5,14 @@ from django.shortcuts import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from CCPDController.permissions import IsQAPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework import status
 from rest_framework.response import Response
 from userController.models import User
-
-# check if body contains valid user information
-def checkBody(body):
-    if len(body['name']) < 3 or len(body['name']) > 40:
-        return HttpResponse('Invalid Name')
-    elif len(body['email']) < 6 or len(body['email']) > 45 or '@' not in body['email']:
-        return HttpResponse('Invalid Email')
-    elif len(body['password']) < 8 or len(body['password']) > 45:
-        return HttpResponse('Invalid Password')
  
 # pymongo
 db = get_db_client()
@@ -28,26 +20,34 @@ collection = db['User']
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-async def login(request):
+def login(request):
     body = decodeJSON(request.body)
     
     # sanitize
     email = sanitizeEmail(body['email'])
     password = sanitizePassword(body['password'])
-    if email is False or password is False:
+    if email == False or password == False:
         return Response('Invalid Login Information', status=status.HTTP_400_BAD_REQUEST)
     
     # check if user exist
-    user = await collection.find_one({'email': email, 'password': password})
-    if user is None:
+    # only retrive user status and role
+    user = collection.find_one({
+        'email': email, 
+        'password': password
+    }, { 'userActive': 1, 'role': 1 })
+    
+    print(user)
+    
+    # check user status
+    if user == None:
         return Response('Login Failed', status=status.HTTP_404_NOT_FOUND)
-    if user['userActive'] is False:
+    if user['userActive'] == False:
         return Response('User Inactive', status=status.HTTP_401_UNAUTHORIZED)
     
     # construct payload
     payload = {
         'id': str(ObjectId(user['_id'])),
-        'exp': datetime.utcnow() + timedelta(days=14),
+        'exp': datetime.utcnow() + timedelta(seconds=30),
         'iat': datetime.utcnow()
     }
     
@@ -57,8 +57,8 @@ async def login(request):
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
-async def getUserById(request):
+@permission_classes([IsQAPermission])
+def getUserById(request):
     body = decodeJSON(request.body)
     
     try:
@@ -68,7 +68,7 @@ async def getUserById(request):
         return Response('User ID Invalid:', status=status.HTTP_401_UNAUTHORIZED)
     
     # query db for user
-    res = await collection.find_one({'_id': uid})
+    res = collection.find_one({'_id': uid})
     if not res:
         return Response('User Not Found', status=status.HTTP_404_NOT_FOUND)
 
@@ -87,14 +87,14 @@ async def getUserById(request):
 
 @csrf_exempt
 @api_view(['POST'])
-async def registerUser(request):
+def registerUser(request):
     body = decodeJSON(request.body)
         
     # check if body is valid
     checkBody(body)
     
     # check if email exist in database
-    res = await collection.find_one({ 'email': body['email'] })
+    res = collection.find_one({ 'email': body['email'] })
     
     # check for existing email
     if res:
@@ -111,7 +111,7 @@ async def registerUser(request):
     )
     
     # insert user into db
-    res = await collection.insert_one(newUser.__dict__)
+    res = collection.insert_one(newUser.__dict__)
 
     # return the registration result
     if res:
@@ -121,46 +121,50 @@ async def registerUser(request):
 
 # delete user by id
 @api_view(['DELETE'])
-async def deleteUserById(request):
+def deleteUserById(request):
     body = decodeJSON(request.body)
     
     # convert to BSON
     uid = ObjectId(body['_id'])
     
     # query db for user
-    res = await collection.find_one({'_id': uid})
+    res = collection.find_one({'_id': uid})
     
     # if found, delete it
     if res :
-        res = await collection.delete_one({'_id': uid})
+        res = collection.delete_one({'_id': uid})
         return HttpResponse('User Deleted')
     else:
         return HttpResponse('User Not Found')
-            
-# update user password
+
+# need object level permission
 # qa personals can update their own password
 # admin password have to be set in mongo manually
 @api_view(['PUT'])
-@csrf_exempt
-async def updatePasswordById(request):
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission])
+def updatePasswordById(request):
     body = decodeJSON(request.body)
     
-    # convert to BSON
-    uid = ObjectId(body['_id'])
+    # if failed to convert to BSON response 401
+    try:
+        uid = ObjectId(body['_id'])
+    except:
+        return Response('User ID Invalid:', status=status.HTTP_401_UNAUTHORIZED)
     
     # query db for user
-    res = await collection.find_one({
+    res = collection.find_one({
         '_id': uid, 
         'role': 'QAPersonal'
     })
     
     # check if password is valid
-    if len(body['password']) < 8 or len(body['password']) > 45:
+    if not sanitizePassword(body['password']):
         return HttpResponse('Invalid Password')
     
     # if found, change its pass word
     if res :
-        await collection.update_one(
+        collection.update_one(
             { '_id': uid }, 
             { '$set': {'password': body['password']} }
         )
