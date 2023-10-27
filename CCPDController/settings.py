@@ -24,6 +24,7 @@ SECRET_KEY = os.getenv('JWT_SECRET')
 INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
+    'django_user_agents',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -37,6 +38,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django_user_agents.middleware.UserAgentMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -85,6 +87,10 @@ REST_FRAMEWORK = {
         # 'CCPDController.authentication.JWTAuthentication',
     ]
 }
+
+# Name of cache backend to cache user agents. If it not specified default
+# cache alias will be used. Set to `None` to disable caching.
+USER_AGENTS_CACHE = None
 
 # DATABASES = {
 #     'default': {

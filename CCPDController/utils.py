@@ -17,17 +17,28 @@ def get_db_client():
 # decode body from json to object
 decodeJSON = lambda body : json.loads(body.decode('utf-8'))\
 
+# limit variables
+max_name = 40
+min_name = 3
+max_email = 45
+min_email = 6
+max_password = 70
+min_password = 8
+min_sku = 4
+max_sku = 7
+
 # check if body contains valid user information
 def checkBody(body):
-    if len(body['name']) < 3 or len(body['name']) > 40:
+    if inRange(body['name'], min_name, min_email):
         return HttpResponse('Invalid Name')
-    elif len(body['email']) < 6 or len(body['email']) > 45 or '@' not in body['email']:
+    elif len(body['email']) < min_email or len(body['email']) > max_email or '@' not in body['email']:
         return HttpResponse('Invalid Email')
-    elif len(body['password']) < 8 or len(body['password']) > 45:
+    elif len(body['password']) < min_password or len(body['password']) > max_password:
         return HttpResponse('Invalid Password')
 
 # check input length
-def checkLen(input, minLen, maxLen):
+# if input is in range return true else return false
+def inRange(input, minLen, maxLen):
     if len(str(input)) < minLen or len(str(input)) > maxLen:
         return False
     else: 
@@ -46,7 +57,7 @@ def sanitizeSku(sku):
         return False
     
     # len check
-    if not checkLen(sku, 4, 7):
+    if not inRange(sku, min_sku, max_sku):
         return False
     return sku
 
@@ -60,7 +71,7 @@ def sanitizeName(name):
     clean_name = removeStr(name)
     
     # len check
-    if len(clean_name) < 3 or len(clean_name) > 40:
+    if not inRange(clean_name, min_name, max_name):
         return False
     return clean_name
 
@@ -71,7 +82,7 @@ def sanitizeEmail(email):
         return False
     
     # len check
-    if len(email) < 7 or len(email) > 40:
+    if not inRange(email, min_email, max_email):
         return False
     return email
 
@@ -79,7 +90,7 @@ def sanitizeEmail(email):
 def sanitizePassword(password):
     if not isinstance(password, str):
         return False
-    if len(password) < 8 or len(password) > 40:
+    if not inRange(password, min_password, max_password):
         return False
     return password
 

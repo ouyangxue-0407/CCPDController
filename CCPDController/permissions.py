@@ -6,37 +6,29 @@ from CCPDController.utils import get_db_client
 db = get_db_client()
 collection = db['User']
 
+# user object will be pass into here from authentication 
+# auth = ROLE
+# user = {
+#   '_id': ObjectId(xxx),
+#   'userActive': xxx,
+#   'role': xxx
+# }
+
 # QA personal permission
 class IsQAPermission(permissions.BasePermission):
-    message = 'Permission Denied, QAPersonal Only'
-    def has_permission(self, request, view):        
-        print(" HAS PERMISSION :: ")
-        print(request.user)
-        print(request.auth)
-        
+    message = 'Permission Denied, QAPersonal Only!'
+    def has_permission(self, request, view):
         # mongo db query
         # grant if user is qa personal and user is active
         if request.auth == 'QAPersonal' and request.user['userActive'] == True:
             return True
 
-# determine if user have permission to access inventory object
-class IsInventoryOwnerPermission(permissions.BasePermission):
-    message = 'Permission Denied, Only Owner Have Access'
-    def has_object_permission(self, request, view, obj):
-        # always allow GET HEAD OPTION method
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        
-        # query db see if object owned by user
-        return obj.owner == request.user
-
 # admin permission
 class IsAdminPermission(permissions.BasePermission):
     message = 'Permission Denied, Admin Only!'
-    
     def has_permission(self, request, view):
-        # query database to see if user is admin
-        return super().has_permission(request, view)
+        if request.auth == 'Admin' and bool(request.user['userActive']) == True :
+            return True
 
 # user blocked by IP black list
 class BlockedPermission(permissions.BasePermission):

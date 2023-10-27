@@ -3,5 +3,7 @@ from . import views
 
 # define all routes
 urlpatterns = [
-    path('login', views.login, name="login"),
+    path('deleteUserById', views.deleteUserById, name="deleteUserById"),
+    path('setUserActive', views.setUserActive, name="setUserActive"),
+    path('updatePasswordById', views.updatePasswordById, name="updatePasswordById"),
 ]

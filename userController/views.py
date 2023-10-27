@@ -18,11 +18,13 @@ from userController.models import User
 db = get_db_client()
 collection = db['User']
 
+# login any user and issue jwt
+# _id: xxx
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
     body = decodeJSON(request.body)
-    
+
     # sanitize
     email = sanitizeEmail(body['email'])
     password = sanitizePassword(body['password'])
@@ -32,7 +34,7 @@ def login(request):
     # check if user exist
     # only retrive user status and role
     user = collection.find_one({
-        'email': email, 
+        'email': email,
         'password': password
     }, { 'userActive': 1, 'role': 1 })
     
@@ -45,7 +47,7 @@ def login(request):
     # construct payload
     payload = {
         'id': str(ObjectId(user['_id'])),
-        'exp': datetime.utcnow() + timedelta(seconds=30),
+        'exp': datetime.utcnow() + timedelta(hours=1),
         'iat': datetime.utcnow()
     }
     
@@ -53,6 +55,8 @@ def login(request):
     token = jwt.encode(payload, settings.SECRET_KEY)
     return Response(token, status.HTTP_200_OK)
 
+# get user information without password
+# _id: xxx
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
@@ -70,7 +74,7 @@ def getUserById(request):
         { '_id': uid }, 
         { 'name': 1, 'email': 1, 'role': 1, 'registrationDate': 1, 'userActive': 1 }
     )
-    if not res:
+    if not res or not res['userActive']:
         return Response('User Not Found', status.HTTP_404_NOT_FOUND)
 
     # construct user object
@@ -78,6 +82,7 @@ def getUserById(request):
         name=res['name'],
         email=res['email'],
         role=res['role'],
+        password=None,
         registrationDate=res['registrationDate'],
         userActive=res['userActive']
     )
@@ -85,20 +90,28 @@ def getUserById(request):
     # return as json object
     return Response(resUser.__dict__, status=status.HTTP_200_OK)
 
+# user registration
+# name: xxx
+# email: xxx
+# password: xxx
+# inviationCode: xxx
 @csrf_exempt
 @api_view(['POST'])
 def registerUser(request):
     body = decodeJSON(request.body)
-        
-    # check if body is valid
-    checkBody(body)
+    checkBody(body) # sanitization
+    
+    # prevent user_agent that is not mobile or tablet from registration
+    # print(request.user_agent.is_mobile)
+    # print(request.user_agent.is_tablet)
+    # print(request.user_agent.is_touch_capable)
+    # print(request.user_agent.is_pc)
+    # print(request.user_agent)
     
     # check if email exist in database
     res = collection.find_one({ 'email': body['email'] })
-    
-    # check for existing email
     if res:
-        return Response('Email already existed!')
+        return Response('Email already existed!', status.HTTP_400_BAD_REQUEST)
     
     # construct user
     newUser = User(
@@ -113,45 +126,37 @@ def registerUser(request):
     # insert user into db
     res = collection.insert_one(newUser.__dict__)
 
-    # return the registration result
     if res:
-        return Response(True)
-    else:
-        return Response(False)
+        return Response('Registration Successful', status.HTTP_200_OK)
+    return Response('Registration Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# need object level permission
-# qa personals can update their own password
-# admin password have to be set in mongo manually
+# QA personal change own password
+# _id: xxx
+# newPassword: xxxx
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
-def updatePasswordById(request):
+def changeOwnPassword(request):
     body = decodeJSON(request.body)
     
-    # if failed to convert to BSON response 401
+    # convert to BSON
     try:
         uid = ObjectId(body['_id'])
+        password = sanitizePassword(body['newPassword'])
     except:
-        return Response('User ID Invalid:', status.HTTP_401_UNAUTHORIZED)
+        return Response('User ID or Password Invalid:', status.HTTP_401_UNAUTHORIZED)
     
-    # query db for user
-    res = collection.find_one({
-        '_id': uid, 
-        'role': 'QAPersonal'
-    })
+    # query for uid and role to be QA personal and update
+    res = collection.update_one(
+        {
+            '_id': uid,
+            'role': 'QAPersonal'
+        },
+        { '$set': {'password': password} }
+    )
     
-    # check if password is valid
-    if not sanitizePassword(body['password']):
-        return Response('Invalid Password')
+    if res:
+        return Response('Password Updated', status.HTTP_200_OK)
+    return Response('Cannot Update Password', status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    # if found, change its pass word
-    if res :
-        collection.update_one(
-            { '_id': uid }, 
-            { '$set': {'password': body['password']} }
-        )
-        return Response('Password Updated')
-    else:
-        return Response('User Not Found')
-

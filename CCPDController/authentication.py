@@ -35,6 +35,8 @@ class JWTAuthentication(TokenAuthentication):
         try:
             # get auth token in request header and concat
             token = request.META.get('HTTP_AUTHORIZATION')
+            if not token:
+                raise AuthenticationFailed('Token Not Found')
             
             # remove space and auth type
             JWTToken = token[7:]
