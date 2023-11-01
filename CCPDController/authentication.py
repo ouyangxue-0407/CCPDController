@@ -1,14 +1,21 @@
 import jwt
-from rest_framework.authentication import get_authorization_header, TokenAuthentication
+from rest_framework.authentication import CSRFCheck, TokenAuthentication
 from bson.objectid import ObjectId
 from django.conf import settings
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from CCPDController.utils import get_db_client
-from userController.models import User
 
 # pymongo
 db = get_db_client()
 collection = db['User']
+
+# check for csrf token in request
+def enforce_csrf(request):
+    check = CSRFCheck(request)
+    check.process_request(request)
+    reason = check.process_view(request, None, (), {})
+    if reason:
+        raise PermissionDenied('CSRF Failed: %s' % reason)
 
 # customized authentication class used in settings
 class JWTAuthentication(TokenAuthentication):
@@ -33,22 +40,34 @@ class JWTAuthentication(TokenAuthentication):
     # called everytime when accessing restricted router
     def authenticate(self, request):
         try:
-            # get auth token in request header and concat
-            token = request.META.get('HTTP_AUTHORIZATION')
-            if not token:
-                raise AuthenticationFailed('Token Not Found')
+            print(request.__dict__)
+            # # get auth token in request header and concat
+            # token = request.META.get('HTTP_AUTHORIZATION')
+            # if not token:
+            #     raise AuthenticationFailed('Token Not Found')
             
-            # remove space and auth type
-            JWTToken = token[7:]
+            # # remove space and auth type
+            # JWTToken = token[7:]
             
-            # if no token throw not found
-            if not JWTToken or len(JWTToken) < 1:
-                raise AuthenticationFailed('Token Not Found')
-
+            # # if no token throw not found
+            # if not JWTToken or len(JWTToken) < 1:
+            #     raise AuthenticationFailed('Token Not Found')
+            
+            # get token from cookies
+            raw_token = request.COOKIES.get('token') or None
+                
+            if not raw_token:
+                raise AuthenticationFailed('No token provided')
+            
             # decode jwt and retrive user id
-            payload = jwt.decode(JWTToken, settings.SECRET_KEY, algorithms='HS256')
+            payload = jwt.decode(raw_token, settings.SECRET_KEY, algorithms='HS256')
+        
         except jwt.DecodeError or UnicodeError:
             raise AuthenticationFailed('Invalid token')
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed('Token has expired')
+        
+        # TODO
+        # check the reason why csrf token cannot be fetch on logout
+        # enforce_csrf(request)
         return self.authenticate_credentials(payload['id'])

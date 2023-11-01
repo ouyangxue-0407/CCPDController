@@ -33,7 +33,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'imageController',
     'inventoryController',
-    'userController'
+    'userController',
+    'adminController'
 ]
 
 MIDDLEWARE = [
@@ -68,6 +69,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
+# for http only cookies
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
 # CORS stuff
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [

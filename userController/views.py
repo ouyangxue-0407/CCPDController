@@ -2,7 +2,8 @@ import jwt
 import json
 from django.conf import settings
 from django.shortcuts import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody
@@ -13,13 +14,17 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework import status
 from rest_framework.response import Response
 from userController.models import User
- 
+
 # pymongo
 db = get_db_client()
 collection = db['User']
 
+# jwt token expiring time
+expire_days = 1
+
 # login any user and issue jwt
 # _id: xxx
+@csrf_protect
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
@@ -41,19 +46,25 @@ def login(request):
     # check user status
     if user == None:
         return Response('Login Failed', status.HTTP_404_NOT_FOUND)
-    if user['userActive'] == False:
+    if bool(user['userActive']) == False:
         return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
 
     # construct payload
     payload = {
         'id': str(ObjectId(user['_id'])),
-        'exp': datetime.utcnow() + timedelta(hours=1),
+        'exp': datetime.utcnow() + timedelta(days=expire_days),
         'iat': datetime.utcnow()
     }
     
     # construct tokent and return it
-    token = jwt.encode(payload, settings.SECRET_KEY)
-    return Response(token, status.HTTP_200_OK)
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+    # construct response store jwt token in http only cookie
+    response = Response('Login Success', status.HTTP_200_OK)
+    response.set_cookie('token', token, httponly=True)
+    response.set_cookie('csrftoken', get_token(request), httponly=True)
+    # response["X-CSRFToken"] = get_token(request)
+    return response
 
 # get user information without password
 # _id: xxx
@@ -74,7 +85,7 @@ def getUserById(request):
         { '_id': uid }, 
         { 'name': 1, 'email': 1, 'role': 1, 'registrationDate': 1, 'userActive': 1 }
     )
-    if not res or not res['userActive']:
+    if not res or not bool(res['userActive']):
         return Response('User Not Found', status.HTTP_404_NOT_FOUND)
 
     # construct user object
@@ -84,7 +95,7 @@ def getUserById(request):
         role=res['role'],
         password=None,
         registrationDate=res['registrationDate'],
-        userActive=res['userActive']
+        userActive=bool(res['userActive'])
     )
     
     # return as json object
@@ -100,13 +111,6 @@ def getUserById(request):
 def registerUser(request):
     body = decodeJSON(request.body)
     checkBody(body) # sanitization
-    
-    # prevent user_agent that is not mobile or tablet from registration
-    # print(request.user_agent.is_mobile)
-    # print(request.user_agent.is_tablet)
-    # print(request.user_agent.is_touch_capable)
-    # print(request.user_agent.is_pc)
-    # print(request.user_agent)
     
     # check if email exist in database
     res = collection.find_one({ 'email': body['email'] })
@@ -130,10 +134,9 @@ def registerUser(request):
         return Response('Registration Successful', status.HTTP_200_OK)
     return Response('Registration Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 # QA personal change own password
 # _id: xxx
-# newPassword: xxxx
+# newPassword: xxx
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
@@ -159,4 +162,15 @@ def changeOwnPassword(request):
     if res:
         return Response('Password Updated', status.HTTP_200_OK)
     return Response('Cannot Update Password', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
+@csrf_protect
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission])
+def logout(request):
+    # construct response
+    response = Response('User Logout', status.HTTP_200_OK)
+    # delete jwt token and csrf token
+    response.delete_cookie('token')
+    response.delete_cookie('csrftoken')
+    return response
