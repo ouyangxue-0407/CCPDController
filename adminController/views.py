@@ -14,13 +14,14 @@ db = get_db_client()
 user_collection = db['User']
 
 # delete user by id
-# '_id': xxxx,
+# _id: string
 @api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
 def deleteUserById(request):
-    body = decodeJSON(request.body)
-    
-    # convert to BSON
     try:
+        # convert to BSON
+        body = decodeJSON(request.body)
         uid = ObjectId(body['_id'])
     except:
         return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
@@ -36,14 +37,16 @@ def deleteUserById(request):
  
  
 #  set any user status to be active or disabled
-# '_id': xxxx,
-# 'password': xxxx
+# _id: string,
+# password: string
+# userActive: bool
 @api_view(['PUT'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
 def setUserActive(request):
-    body = decodeJSON(request.body)
-    
-    # convert to BSON
     try:
+        # convert to BSON
+        body = decodeJSON(request.body)
         uid = ObjectId(body['_id'])
     except:
         return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
@@ -63,7 +66,7 @@ def setUserActive(request):
 
 
 # admin generate invitation code for newly hired QA personal to join
-@api_view(['POST'])
+@api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def issueInvitationCode(request):
@@ -75,16 +78,15 @@ def issueInvitationCode(request):
     return Response('Invitation Code Created: '.join(inviteCode), status.HTTP_200_OK)
 
 # update anyones password by id
-# '_id': xxxx,
-# 'password': xxxx
+# _id: string
+# newpassword: string
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def updatePasswordById(request):
-    body = decodeJSON(request.body)
-    
-    # if failed to convert to BSON response 401
     try:
+        # if failed to convert to BSON response 401
+        body = decodeJSON(request.body)
         uid = ObjectId(body['_id'])
     except:
         return Response('User ID Invalid:', status.HTTP_400_BAD_REQUEST)

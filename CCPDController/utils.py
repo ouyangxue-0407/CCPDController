@@ -2,7 +2,7 @@ import os
 import json
 import jwt
 from django.conf import settings
-from django.shortcuts import HttpResponse
+from rest_framework.response import Response
 from rest_framework import exceptions
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -24,17 +24,18 @@ max_email = 45
 min_email = 6
 max_password = 70
 min_password = 8
-min_sku = 4
 max_sku = 7
+min_sku = 4
 
 # check if body contains valid user information
 def checkBody(body):
-    if inRange(body['name'], min_name, min_email):
-        return HttpResponse('Invalid Name')
-    elif len(body['email']) < min_email or len(body['email']) > max_email or '@' not in body['email']:
-        return HttpResponse('Invalid Email')
-    elif len(body['password']) < min_password or len(body['password']) > max_password:
-        return HttpResponse('Invalid Password')
+    if not inRange(body['name'], min_name, max_name):
+        return False
+    elif not inRange(body['email'], min_email, max_email) or '@' not in body['email']:
+        return False
+    elif not inRange(body['password'], min_password, max_password):
+        return False
+    return body
 
 # check input length
 # if input is in range return true else return false
@@ -47,7 +48,6 @@ def inRange(input, minLen, maxLen):
 # sanitize mongodb strings
 def removeStr(input):
     input.replace('$', '')
-    input.replace('.', '')
     return input
 
 # skuy can be from 3 chars to 40 chars

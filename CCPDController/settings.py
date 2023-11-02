@@ -71,17 +71,22 @@ WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
 # for http only cookies
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
-# CORS stuff
+
+# cors stuff
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8100",
-    "http://127.0.0.1:8100"
+    "http://127.0.0.1:8100",
+    "http://192.168.2.62:8100"
 ]
 
+# csrf stuff
+CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8100",
-    "http://localhost:8100"
+    "http://localhost:8100",
+    "http://192.168.2.62:8100"
 ]
 
 # Django rest framework

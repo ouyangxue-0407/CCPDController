@@ -40,22 +40,8 @@ class JWTAuthentication(TokenAuthentication):
     # called everytime when accessing restricted router
     def authenticate(self, request):
         try:
-            print(request.__dict__)
-            # # get auth token in request header and concat
-            # token = request.META.get('HTTP_AUTHORIZATION')
-            # if not token:
-            #     raise AuthenticationFailed('Token Not Found')
-            
-            # # remove space and auth type
-            # JWTToken = token[7:]
-            
-            # # if no token throw not found
-            # if not JWTToken or len(JWTToken) < 1:
-            #     raise AuthenticationFailed('Token Not Found')
-            
-            # get token from cookies
+            # check for http-only cookies
             raw_token = request.COOKIES.get('token') or None
-                
             if not raw_token:
                 raise AuthenticationFailed('No token provided')
             

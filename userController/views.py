@@ -1,5 +1,4 @@
 import jwt
-import json
 from django.conf import settings
 from django.shortcuts import HttpResponse
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
@@ -7,10 +6,11 @@ from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody
-from CCPDController.permissions import IsQAPermission
+from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework import status
 from rest_framework.response import Response
 from userController.models import User
@@ -21,6 +21,27 @@ collection = db['User']
 
 # jwt token expiring time
 expire_days = 1
+
+# will be called every time on open app
+@csrf_protect
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def checkToken(request):
+    # get token
+    token = request.COOKIES.get('token')
+    
+    # decode and return user id
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
+    except jwt.DecodeError or UnicodeError:
+        raise AuthenticationFailed('Invalid token')
+    except jwt.ExpiredSignatureError:
+        raise AuthenticationFailed('Token has expired')
+
+    if token:
+        return Response(payload['id'], status.HTTP_200_OK)
+    return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
 
 # login any user and issue jwt
 # _id: xxx
@@ -49,21 +70,23 @@ def login(request):
     if bool(user['userActive']) == False:
         return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
 
-    # construct payload
-    payload = {
-        'id': str(ObjectId(user['_id'])),
-        'exp': datetime.utcnow() + timedelta(days=expire_days),
-        'iat': datetime.utcnow()
-    }
-    
-    # construct tokent and return it
-    token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    try:
+        # construct payload
+        payload = {
+            'id': str(ObjectId(user['_id'])),
+            'exp': datetime.utcnow() + timedelta(days=expire_days),
+            'iat': datetime.utcnow()
+        }
+        
+        # construct tokent and return it
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    except:
+        return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # construct response store jwt token in http only cookie
-    response = Response('Login Success', status.HTTP_200_OK)
+    response = Response(str(ObjectId(user['_id'])), status.HTTP_200_OK)
     response.set_cookie('token', token, httponly=True)
     response.set_cookie('csrftoken', get_token(request), httponly=True)
-    # response["X-CSRFToken"] = get_token(request)
     return response
 
 # get user information without password
@@ -72,13 +95,12 @@ def login(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
 def getUserById(request):
-    body = decodeJSON(request.body)
-    
     try:
         # convert to BSON
+        body = decodeJSON(request.body)
         uid = ObjectId(body['_id'])
     except:
-        return Response('User ID Invalid:', status.HTTP_401_UNAUTHORIZED)
+        return Response('Invalid User ID', status.HTTP_401_UNAUTHORIZED)
     
     # query db for user
     res = collection.find_one(
@@ -105,12 +127,16 @@ def getUserById(request):
 # name: xxx
 # email: xxx
 # password: xxx
-# inviationCode: xxx
-@csrf_exempt
+# inviationCode: xxx (pending)
+@csrf_protect
 @api_view(['POST'])
 def registerUser(request):
-    body = decodeJSON(request.body)
-    checkBody(body) # sanitization
+    # sanitization
+    body = checkBody(decodeJSON(request.body))
+    if not body:
+        return Response('Invalid registration info!', status.HTTP_400_BAD_REQUEST)
+    
+    # implement invitation code later
     
     # check if email exist in database
     res = collection.find_one({ 'email': body['email'] })
@@ -141,10 +167,9 @@ def registerUser(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
 def changeOwnPassword(request):
-    body = decodeJSON(request.body)
-    
-    # convert to BSON
     try:
+        # convert to BSON
+        body = decodeJSON(request.body)
         uid = ObjectId(body['_id'])
         password = sanitizePassword(body['newPassword'])
     except:
@@ -166,11 +191,14 @@ def changeOwnPassword(request):
 @csrf_protect
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission])
+@permission_classes([IsAdminPermission | IsQAPermission])
 def logout(request):
     # construct response
     response = Response('User Logout', status.HTTP_200_OK)
-    # delete jwt token and csrf token
-    response.delete_cookie('token')
-    response.delete_cookie('csrftoken')
+    try:
+        # delete jwt token and csrf token
+        response.delete_cookie('token')
+        response.delete_cookie('csrftoken')
+    except:
+        return Response('Token Not Found', status.HTTP_404_NOT_FOUND)
     return response
