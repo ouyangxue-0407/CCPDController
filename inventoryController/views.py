@@ -10,58 +10,70 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from bson.objectid import ObjectId
+import json
 
 # pymongo
 db = get_db_client()
 collection = db['Inventory']
 
 # query param sku for inventory db row
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission, IsAdminPermission])
-async def getInventoryBySku(request):
-    body = decodeJSON(request.body)
-    sku = sanitizeSku(body['sku'])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def getInventoryBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
-    if sku:
-        res = await collection.find_one({'sku': sku})
-        return Response(res)
-    else:
-        return Response('Invalid SKU')     
+    if not sku:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+
+    res = collection.find_one({'sku': sku}, {'_id': 0})
+    
+    if not res:
+        return Response(sku, status.HTTP_404_NOT_FOUND)
+    return Response(res, status.HTTP_200_OK)
         
 # get all inventory by QA personal
-@api_view(['GET'])
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
 def getInventoryByOwnerId(request):
-    body = decodeJSON(request.body)
-    print(body['_id'])
     
+    print(request.body)
     try:
-        ownerId = ObjectId(body['_id'])
+        body = decodeJSON(request.body)
+    except:
+        return Response('Invalid Body',status.HTTP_400_BAD_REQUEST)
+
+    try:
+        ownerId = str(ObjectId(body['id']))
     except:
         return Response('Invalid Id', status.HTTP_400_BAD_REQUEST)
     
-    
-    # need a fix
+    # return all inventory from owner in array
     arr = []
-    for inventory in collection.find({ 'owner': str(ownerId) }):
+    for inventory in collection.find({ 'owner': ownerId }):
+        inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
-    
-    print(arr)
     
     return Response(arr, status.HTTP_200_OK)
 
 # create single inventory Q&A record
-@csrf_exempt
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission, IsAdminPermission])
-async def createInventory(request):
+@permission_classes([IsQAPermission | IsAdminPermission])
+def createInventory(request):
     body = decodeJSON(request.body)
     sku = sanitizeSku(body['sku'])
     comment = removeStr(body['comment'])
 
     # if sku exist return error
-    await collection.find_one({'sku': body['sku']})
+    inv = collection.find_one({'sku': body['sku']})
+    if inv:
+        return Response('SKU Already Existed')
     
     # construct new inventory
     newInventory = InventoryItem(
@@ -81,29 +93,68 @@ async def createInventory(request):
     return Response(newInventory)
 
 # query param sku and body of new inventory info
-# sku
+# sku: string
+# newInventory: Inventory
+"""
+{
+    sku: xxxxx,
+    newInv: {
+        sku,
+        itemCondition,
+        comment,
+        link,
+        platform,
+        shelfLocation,
+        amount
+    }
+}
+"""
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission, IsAdminPermission])
+@permission_classes([IsQAPermission | IsAdminPermission])
 def updateInventoryBySku(request):
     try:
         # convert to object id
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
+        newInv = body['newInventory']
     except:
         return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
     
+    # grab existing inventory
+    oldInv = collection.find_one({ 'sku': sku })
+    if not oldInv:
+        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
+    try:
+        # construct new inventory
+        newInventory = InventoryItem(
+            time = str(ctime(time())),
+            sku = newInv['sku'] if newInv['sku'] is not None else oldInv['sku'],
+            itemCondition = newInv['itemCondition'] if newInv['itemCondition'] is not None else oldInv['itemCondition'],
+            comment = newInv['comment'] if newInv['comment'] is not None else oldInv['comment'],
+            link = newInv['link'] if newInv['link'] is not None else oldInv['link'],
+            platform = newInv['platform'] if newInv['platform'] is not None else oldInv['platform'],
+            shelfLocation = newInv['shelfLocation'] if newInv['shelfLocation'] is not None else oldInv['shelfLocation'],
+            amount = newInv['amount'] if newInv['amount'] is not None else oldInv['amount']
+        )
+    except:
+        return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
+        
     # update inventory
     res = collection.update_one(
+        { 'sku': sku },
         {
-            'sku': sku,
-        },
-        { '$set': 
+            '$set': 
             {
-                'password': 
-                ''
-            } 
+                'sku': newInventory.sku,
+                'itemCondition': newInventory.itemCondition,
+                'comment': newInventory.comment,
+                'link': newInventory.link,
+                'platform': newInventory.platform,
+                'shelfLocation': newInventory.shelfLocation,
+                'amount': newInventory.amount
+            }
         }
     )
 
@@ -113,8 +164,10 @@ def updateInventoryBySku(request):
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-async def deleteInventoryBySku(request):
-    body = decodeJSON(request.body)
-    
-    # delete inventory by sku
-    await collection.find_one({ 'sku': body['sku'] })
+def deleteInventoryBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sanitizeSku(body['sku'])
+    except:
+        # delete inventory by sku
+        collection.find_one({ 'sku': body['sku'] })

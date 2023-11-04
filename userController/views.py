@@ -40,7 +40,9 @@ def checkToken(request):
         raise AuthenticationFailed('Token has expired')
 
     if token:
-        return Response(payload['id'], status.HTTP_200_OK)
+        user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
+        if user:
+            return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
     return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
 
 # login any user and issue jwt
@@ -62,7 +64,7 @@ def login(request):
     user = collection.find_one({
         'email': email,
         'password': password
-    }, { 'userActive': 1, 'role': 1 })
+    }, { 'userActive': 1, 'role': 1, 'name': 1 })
     
     # check user status
     if user == None:
@@ -83,8 +85,14 @@ def login(request):
     except:
         return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # return the id and name
+    info = {
+        'id': str(ObjectId(user['_id'])),
+        'name': user['name']
+    }
+
     # construct response store jwt token in http only cookie
-    response = Response(str(ObjectId(user['_id'])), status.HTTP_200_OK)
+    response = Response(info, status.HTTP_200_OK)
     response.set_cookie('token', token, httponly=True)
     response.set_cookie('csrftoken', get_token(request), httponly=True)
     return response
