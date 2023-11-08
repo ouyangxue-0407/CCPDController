@@ -1,10 +1,17 @@
+import jwt
 import uuid
+import json
+from django.conf import settings
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_protect
+from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
+from datetime import date, datetime, timedelta
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword
@@ -12,6 +19,86 @@ from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanit
 # pymongo
 db = get_db_client()
 user_collection = db['User']
+inventory_collection = db['Inventory']
+
+# admin jwt token expiring time
+admin_expire_days = 90
+
+@csrf_protect
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def checkAdminToken(request):
+    # get token
+    token = request.COOKIES.get('token')
+    
+    # decode and return user id
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
+    except jwt.DecodeError or UnicodeError:
+        raise AuthenticationFailed('Invalid token')
+    except jwt.ExpiredSignatureError:
+        raise AuthenticationFailed('Token has expired')
+
+    if token:
+        user = user_collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
+        if user:
+            return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
+    return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
+
+# login any user and issue jwt
+@csrf_protect
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def adminLogin(request):
+    body = decodeJSON(request.body)
+
+    # sanitize
+    email = sanitizeEmail(body['email'])
+    password = sanitizePassword(body['password'])
+    if email == False or password == False:
+        return Response('Invalid Login Information', status.HTTP_400_BAD_REQUEST)
+    
+    # check if user exist
+    # only retrive user status and role
+    user = user_collection.find_one({
+        'email': email,
+        'password': password
+    }, { 'userActive': 1, 'role': 1, 'name': 1 })
+    
+    # check user status
+    if not user:
+        return Response('Login Failed', status.HTTP_404_NOT_FOUND)
+    if bool(user['userActive']) == False:
+        return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
+    if (user['role'] != 'Admin'):
+        return Response('Permission Denied', status.HTTP_403_FORBIDDEN)
+
+    try:
+        # construct payload
+        payload = {
+            'id': str(ObjectId(user['_id'])),
+            'exp': datetime.utcnow() + timedelta(days=admin_expire_days),
+            'iat': datetime.utcnow()
+        }
+        
+        # construct tokent and return it
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    except:
+        return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # return the id and name
+    info = {
+        'id': str(ObjectId(user['_id'])),
+        'name': user['name']
+    }
+
+    # construct response store jwt token in http only cookie
+    response = Response(info, status.HTTP_200_OK)
+    response.set_cookie('token', token, httponly=True)
+    response.set_cookie('csrftoken', get_token(request), httponly=True)
+    return response
+
 
 # delete user by id
 # _id: string
@@ -106,3 +193,14 @@ def updatePasswordById(request):
         )
         return Response('Password Updated', status.HTTP_200_OK)
     return Response('User Not Found', status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllInventory(request): 
+    inv = []
+    for item in inventory_collection.find({}, {'_id': 0}):
+        inv.append(item)
+    
+    return Response(inv, status.HTTP_200_OK)
