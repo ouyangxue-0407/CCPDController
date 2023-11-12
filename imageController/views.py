@@ -1,83 +1,75 @@
+from io import BytesIO
 import os
 import json
 from time import time, ctime
 from imageController.models import InventoryImage
 from django.shortcuts import render, HttpResponse
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.core.exceptions import ResourceExistsError
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.response import Response
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, sanitizeName, removeStr
+from CCPDController.authentication import JWTAuthentication
+from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from pymongo import MongoClient
 from dotenv import load_dotenv
 load_dotenv()
 
 # Azure Blob
-# azure_blob_client = ContainerClient(os.getenv('SAS_KEY'), 'ccpd')
-azure_blob_client = BlobServiceClient(os.getenv('SAS_KEY'))
-container = azure_blob_client.get_container_client("product-image")
-# container = client.get_container_client('product-image')
+# blob client object from azure access keys
+azure_blob_client = BlobServiceClient.from_connection_string(os.getenv('SAS_KEY'))
+# container handle for product image
+product_image_container = azure_blob_client.get_container_client("product-image")
 
 # MongoDB
-mongo_client = MongoClient(os.getenv('DATABASE_URL'))
-db = mongo_client['CCPD']
+db = get_db_client()
 collection = db['InventoryImage']
 
-# single image download
-def downloadSingleImage(request):
-    if request.method == 'GET':
-        print(request)
-        return collection.find()
-    return HttpResponse("Please use GET method")
-    
-# single image download
-def bulkDownloadImages(request):
-    if request.method == 'GET':
-        print(request)
-
-
-    return HttpResponse("Please use GET method")
-
 # download all images related to 1 sku
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
 def downloadAllImagesBySKU(request):
-    if request.method == 'GET':
-        print(request)
+    
+    print(request.data)
+    return Response('here is all the image for sku: ', status.HTTP_200_OK)
 
 # single image upload
-# @csrf_exempt
-def uploadSingleImage(request):
-    if request.method == 'PUT' and request.body:
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def uploadImage(request, sku):
+    # request body is unreadable binary code
+    # sku will be in the path parameter
+    # request.FILES looks like this and is a multi-value dictionary
+    # {
+    #     'IMG_20231110_150642.jpg': [<InMemoryUploadedFile: IMG_20231110_150642.jpg (image/jpeg)>], 
+    #     'IMG_20231110_150000.jpg': [<InMemoryUploadedFile: IMG_20231110_150000.jpg (image/jpeg)>]
+    # }
+    for name, value in request.FILES.items():
+        imageName = sku + '/' + sku + '_' + name
+        try:
+            res = product_image_container.upload_blob(imageName, value.file)
+            print(res.url)
+        except ResourceExistsError:
+            return Response(imageName + 'Already Exist!', status.HTTP_409_CONFLICT)
         
-        # decode body to python object
-        body = json.loads(request.body.decode('utf-8'))
-        
-        # construct the blob object
-        blob = BlobClient.from_connection_string(
-            conn_str=os.getenv('BLOB_KEY'), 
-            container_name="product-image", 
-            blob_name=body["sku"]
-        )
+    # construct database row object
+    # newInventoryImage = InventoryImage(
+    #     time = str(ctime(time())),
+    #     sku = body["sku"],
+    #     owner = body["owner"],
+    #     images = body["images"]
+    # )
     
-        # upload blob to azure
-        blob.upload_blob(body["images"][0])
+    # push data to MongoDB
+    # await collection.insert_one(newInventoryImage.__dict__)
 
-        # construct database row object
-        newInventoryImage = InventoryImage(
-            time = str(ctime(time())),
-            sku = body["sku"],
-            owner = body["owner"],
-            images = body["images"]
-        )
-        
-        # push data to MongoDB
-        # await collection.insert_one(newInventoryImage.__dict__)
-
-        return HttpResponse("upload single image")
-    return HttpResponse("Please upload using PUT method with JSON body")
-
-# bulk image upload
-def bulkUploadImages(request):
-    print(request)
-    return HttpResponse("Multiple image upload happens here")
+    return Response("Upload Success", status.HTTP_200_OK)
 
 # list blob containers
 def listBlobContainers(request):
     if request.method == 'GET':
-        return HttpResponse(container.list_blob_names())
+        return HttpResponse(product_image_container.list_blob_names())

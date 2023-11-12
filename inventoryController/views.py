@@ -11,12 +11,15 @@ from rest_framework.response import Response
 from rest_framework import status
 from bson.objectid import ObjectId
 import json
+import pymongo
 
 # pymongo
 db = get_db_client()
 collection = db['Inventory']
+user_collection = db['User']
 
 # query param sku for inventory db row
+# sku: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
@@ -30,19 +33,23 @@ def getInventoryBySku(request):
     if not sku:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
 
+    # find the Q&A record
     res = collection.find_one({'sku': sku}, {'_id': 0})
+    # get user info
+    user = user_collection.find_one({'_id': ObjectId(res['owner'])}, {'name': 1, 'userActive': 1, '_id': 0})
+    # replace owner field in response
+    res['owner'] = user
     
     if not res:
         return Response(sku, status.HTTP_404_NOT_FOUND)
     return Response(res, status.HTTP_200_OK)
         
 # get all inventory by QA personal
+# id: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
 def getInventoryByOwnerId(request):
-    
-    print(request.body)
     try:
         body = decodeJSON(request.body)
     except:
@@ -55,7 +62,7 @@ def getInventoryByOwnerId(request):
     
     # return all inventory from owner in array
     arr = []
-    for inventory in collection.find({ 'owner': ownerId }):
+    for inventory in collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING):
         inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
     
@@ -66,14 +73,17 @@ def getInventoryByOwnerId(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
 def createInventory(request):
-    body = decodeJSON(request.body)
-    sku = sanitizeSku(body['sku'])
-    comment = removeStr(body['comment'])
+    
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
     # if sku exist return error
     inv = collection.find_one({'sku': body['sku']})
     if inv:
-        return Response('SKU Already Existed')
+        return Response('SKU Already Existed', status.HTTP_409_CONFLICT)
     
     # construct new inventory
     newInventory = InventoryItem(
@@ -90,7 +100,7 @@ def createInventory(request):
     
     # pymongo need dict or bson object
     res = collection.insert_one(newInventory.__dict__)
-    return Response(newInventory)
+    return Response('Inventory Created', status.HTTP_200_OK)
 
 # query param sku and body of new inventory info
 # sku: string
