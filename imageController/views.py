@@ -40,7 +40,7 @@ def downloadAllImagesBySKU(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def uploadImage(request, sku):
+def uploadImage(request, sku, owner):
     # request body is unreadable binary code
     # sku will be in the path parameter
     # request.FILES looks like this and is a multi-value dictionary
@@ -48,14 +48,23 @@ def uploadImage(request, sku):
     #     'IMG_20231110_150642.jpg': [<InMemoryUploadedFile: IMG_20231110_150642.jpg (image/jpeg)>], 
     #     'IMG_20231110_150000.jpg': [<InMemoryUploadedFile: IMG_20231110_150000.jpg (image/jpeg)>]
     # }
+    
+    # loop the files in the request
     for name, value in request.FILES.items():
+        # add tags of owner and time info
+        inventory_tags = {
+            "sku": sku, 
+            "time": str(ctime(time())),
+            "owner": owner
+        }
+        # images will be uploaded to the folder named after their sku
         imageName = sku + '/' + sku + '_' + name
         try:
-            res = product_image_container.upload_blob(imageName, value.file)
-            print(res.url)
+            res = product_image_container.upload_blob(imageName, value.file, tags=inventory_tags)
         except ResourceExistsError:
             return Response(imageName + 'Already Exist!', status.HTTP_409_CONFLICT)
-        
+    
+    
     # construct database row object
     # newInventoryImage = InventoryImage(
     #     time = str(ctime(time())),
@@ -67,9 +76,14 @@ def uploadImage(request, sku):
     # push data to MongoDB
     # await collection.insert_one(newInventoryImage.__dict__)
 
-    return Response("Upload Success", status.HTTP_200_OK)
+    return Response(res.url, status.HTTP_200_OK)
 
 # list blob containers
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
 def listBlobContainers(request):
-    if request.method == 'GET':
-        return HttpResponse(product_image_container.list_blob_names())
+    
+    
+    return Response('Listing blob containers......', status.HTTP_200_OK)
+    
