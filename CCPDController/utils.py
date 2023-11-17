@@ -8,10 +8,10 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 load_dotenv()
 
-# get pymongo client obj
+# construct mongoDB client
+client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=2)
+db_handle = client[os.getenv('DB_NAME')]
 def get_db_client():
-    client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=2)
-    db_handle = client[os.getenv('DB_NAME')]
     return db_handle
 
 # decode body from json to object
@@ -27,7 +27,10 @@ min_password = 8
 max_sku = 7
 min_sku = 4
 
-# check if body contains valid user information
+# time format to convert from string to datetime
+time_format = "%a %b %d %H:%M:%S %Y"
+
+# check if body contains valid user registration information
 def checkBody(body):
     if not inRange(body['name'], min_name, max_name):
         return False

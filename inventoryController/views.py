@@ -1,8 +1,8 @@
 from time import time, ctime
-from django.shortcuts import HttpResponse
+from datetime import datetime, timedelta
 from django.views.decorators.csrf import csrf_exempt
 from inventoryController.models import InventoryItem
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, sanitizeName, removeStr
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, time_format
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -122,37 +122,52 @@ def createInventory(request):
     }
 }
 """
-@api_view(['POST'])
+@api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def updateInventoryBySku(request):
+def updateInventoryBySku(request, sku):
     try:
         # convert to object id
         body = decodeJSON(request.body)
-        sku = sanitizeSku(body['sku'])
-        newInv = body['newInventory']
+        sku = sanitizeSku(sku)
+        if not sku:
+            return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+        # check body
+        newInv = body['newInventoryInfo']
+        newInventory = InventoryItem(
+            time = newInv['time'],
+            sku = newInv['sku'],
+            itemCondition = newInv['time'],
+            comment = newInv['comment'],
+            link = newInv['link'],
+            platform = newInv['platform'],
+            shelfLocation = newInv['shelfLocation'],
+            amount = newInv['amount'],
+            owner = newInv['owner']
+        )
     except:
-        return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
+        return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
     
-    # grab existing inventory
+    print(sku)
+    # check if inventory exists
     oldInv = collection.find_one({ 'sku': sku })
     if not oldInv:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
-    try:
-        # construct new inventory
-        newInventory = InventoryItem(
-            time = str(ctime(time())),
-            sku = newInv['sku'] if newInv['sku'] is not None else oldInv['sku'],
-            itemCondition = newInv['itemCondition'] if newInv['itemCondition'] is not None else oldInv['itemCondition'],
-            comment = newInv['comment'] if newInv['comment'] is not None else oldInv['comment'],
-            link = newInv['link'] if newInv['link'] is not None else oldInv['link'],
-            platform = newInv['platform'] if newInv['platform'] is not None else oldInv['platform'],
-            shelfLocation = newInv['shelfLocation'] if newInv['shelfLocation'] is not None else oldInv['shelfLocation'],
-            amount = newInv['amount'] if newInv['amount'] is not None else oldInv['amount']
-        )
-    except:
-        return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
+    # try:
+    #     # construct new inventory
+    #     newInventory = InventoryItem(
+    #         time = str(ctime(time())),
+    #         sku = newInv['sku'] if newInv['sku'] is not None else oldInv['sku'],
+    #         itemCondition = newInv['itemCondition'] if newInv['itemCondition'] is not None else oldInv['itemCondition'],
+    #         comment = newInv['comment'] if newInv['comment'] is not None else oldInv['comment'],
+    #         link = newInv['link'] if newInv['link'] is not None else oldInv['link'],
+    #         platform = newInv['platform'] if newInv['platform'] is not None else oldInv['platform'],
+    #         shelfLocation = newInv['shelfLocation'] if newInv['shelfLocation'] is not None else oldInv['shelfLocation'],
+    #         amount = newInv['amount'] if newInv['amount'] is not None else oldInv['amount']
+    #     )
+    # except:
+    #     return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
         
     # update inventory
     res = collection.update_one(
@@ -170,16 +185,40 @@ def updateInventoryBySku(request):
             }
         }
     )
+    
+    return Response('Update Success', status.HTTP_200_OK)
 
 
 # delete inventory by sku
+# QA personal can only delete record created within 24h
+# sku: string
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsQAPermission])
 def deleteInventoryBySku(request):
     try:
         body = decodeJSON(request.body)
-        sanitizeSku(body['sku'])
+        sku = sanitizeSku(body['sku'])
     except:
-        # delete inventory by sku
-        collection.find_one({ 'sku': body['sku'] })
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    if not sku:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    # pull time
+    res = collection.find_one({'sku': sku}, {'time': 1})
+    if not res:
+        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
+    
+
+    # calculate time left to delete, prevent delete if result delta seconds is negative
+    # convert form time string to time obj
+    timeCreated = datetime.strptime(res['time'], time_format)
+    one_day_later = timeCreated + timedelta(days=1)
+    today = datetime.now()
+    canDel = (one_day_later - today).total_seconds() > 0
+    
+    # perform deletion or throw error
+    if canDel:
+        de = collection.delete_one({'sku': sku})
+        return Response('Inventory Deleted', status.HTTP_200_OK)
+    return Response('Cannot Delete Inventory After 24H, Please Contact Admin', status.HTTP_403_FORBIDDEN)
