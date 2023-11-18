@@ -20,7 +20,7 @@ db = get_db_client()
 collection = db['User']
 
 # jwt token expiring time
-expire_days = 1
+expire_days = 14
 
 # will be called every time on open app
 @csrf_protect
@@ -37,7 +37,7 @@ def checkToken(request):
     except jwt.DecodeError or UnicodeError:
         raise AuthenticationFailed('Invalid token')
     except jwt.ExpiredSignatureError:
-        raise AuthenticationFailed('Token has expired')
+        raise AuthenticationFailed('No Token')
 
     if token:
         user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
@@ -85,7 +85,7 @@ def login(request):
     except:
         return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # return the id and name
+    # return the id and name with token in http only cookie
     info = {
         'id': str(ObjectId(user['_id'])),
         'name': user['name']
@@ -95,6 +95,7 @@ def login(request):
     response = Response(info, status.HTTP_200_OK)
     response.set_cookie('token', token, httponly=True)
     response.set_cookie('csrftoken', get_token(request), httponly=True)
+    print(token)
     return response
 
 # get user information without password

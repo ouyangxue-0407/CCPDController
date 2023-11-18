@@ -6,7 +6,3 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["email", "password"]
         
-class StudentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Student
-        fields = ["name", "roll", "city"]

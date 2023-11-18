@@ -15,7 +15,9 @@ SECRET_KEY = 'django-insecure-x9@&zufge$doq71yfj!wfl*9ke=5&^+e-yjn*p+-97wz1)w)y1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '192.168.2.62'
+]
 
 # JWT Secret
 SECRET_KEY = os.getenv('JWT_SECRET')
@@ -86,7 +88,7 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8100",
     "http://localhost:8100",
-    "http://192.168.2.62:8100"
+    "http://192.168.2.62:8100",
 ]
 
 # Django rest framework

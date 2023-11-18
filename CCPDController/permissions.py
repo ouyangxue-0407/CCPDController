@@ -7,8 +7,8 @@ db = get_db_client()
 collection = db['User']
 
 # user object will be pass into here from authentication 
-# auth = ROLE
-# user = {
+# request.auth = ROLE
+# request.user = {
 #   '_id': ObjectId(xxx),
 #   'userActive': xxx,
 #   'role': xxx

@@ -146,9 +146,8 @@ def updateInventoryBySku(request, sku):
             owner = newInv['owner']
         )
     except:
-        return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
+        return Response('Invalid Inventory Info', status.HTTP_406_NOT_ACCEPTABLE)
     
-    print(sku)
     # check if inventory exists
     oldInv = collection.find_one({ 'sku': sku })
     if not oldInv:
@@ -175,7 +174,6 @@ def updateInventoryBySku(request, sku):
         {
             '$set': 
             {
-                'sku': newInventory.sku,
                 'itemCondition': newInventory.itemCondition,
                 'comment': newInventory.comment,
                 'link': newInventory.link,
