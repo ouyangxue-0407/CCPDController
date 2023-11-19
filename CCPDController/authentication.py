@@ -31,8 +31,8 @@ class JWTAuthentication(TokenAuthentication):
         user = collection.find_one({'_id': uid}, {'userActive': 1, 'role': 1})
         
         # check user activation status
-        if not user['userActive']:
-            raise AuthenticationFailed('User Inactive')
+        if not user or user['userActive'] == False:
+            raise AuthenticationFailed('User Not Found Or Inactive')
         
         # return type have to be tuple
         return (user, user['role'])

@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -41,6 +41,8 @@ def checkToken(request):
 
     if token:
         user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
+        if user['userActive'] == False:
+            return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
         if user:
             return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
     return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
@@ -95,7 +97,6 @@ def login(request):
     response = Response(info, status.HTTP_200_OK)
     response.set_cookie('token', token, httponly=True)
     response.set_cookie('csrftoken', get_token(request), httponly=True)
-    print(token)
     return response
 
 # get user information without password

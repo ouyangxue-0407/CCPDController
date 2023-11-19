@@ -17,6 +17,15 @@ def get_db_client():
 # decode body from json to object
 decodeJSON = lambda body : json.loads(body.decode('utf-8'))\
 
+# get client ip address
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
 # limit variables
 max_name = 40
 min_name = 3

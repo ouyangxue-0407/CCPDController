@@ -16,7 +16,8 @@ SECRET_KEY = 'django-insecure-x9@&zufge$doq71yfj!wfl*9ke=5&^+e-yjn*p+-97wz1)w)y1
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    '192.168.2.62'
+    '192.168.2.62',
+    '127.0.0.1'
 ]
 
 # JWT Secret
@@ -71,24 +72,27 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
-# for http only cookies
+# cookies setting
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = None
 
 # cors stuff
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8100",
     "http://127.0.0.1:8100",
-    "http://192.168.2.62:8100"
+    "http://127.0.0.1:5173",
+    "http://192.168.2.62:8100",
+    "http://192.168.2.62:5173",
 ]
 
 # csrf stuff
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8100",
-    "http://localhost:8100",
+    "http://127.0.0.1:5173",
     "http://192.168.2.62:8100",
+    "http://192.168.2.62:5173",
 ]
 
 # Django rest framework

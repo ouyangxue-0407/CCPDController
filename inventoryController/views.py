@@ -2,7 +2,7 @@ from time import time, ctime
 from datetime import datetime, timedelta
 from django.views.decorators.csrf import csrf_exempt
 from inventoryController.models import InventoryItem
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, time_format
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, time_format, get_client_ip
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -10,7 +10,6 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from bson.objectid import ObjectId
-import json
 import pymongo
 
 # pymongo
@@ -153,33 +152,18 @@ def updateInventoryBySku(request, sku):
     if not oldInv:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
-    # try:
-    #     # construct new inventory
-    #     newInventory = InventoryItem(
-    #         time = str(ctime(time())),
-    #         sku = newInv['sku'] if newInv['sku'] is not None else oldInv['sku'],
-    #         itemCondition = newInv['itemCondition'] if newInv['itemCondition'] is not None else oldInv['itemCondition'],
-    #         comment = newInv['comment'] if newInv['comment'] is not None else oldInv['comment'],
-    #         link = newInv['link'] if newInv['link'] is not None else oldInv['link'],
-    #         platform = newInv['platform'] if newInv['platform'] is not None else oldInv['platform'],
-    #         shelfLocation = newInv['shelfLocation'] if newInv['shelfLocation'] is not None else oldInv['shelfLocation'],
-    #         amount = newInv['amount'] if newInv['amount'] is not None else oldInv['amount']
-    #     )
-    # except:
-    #     return Response('Invalid Inventory Info', status.HTTP_400_BAD_REQUEST)
-        
     # update inventory
     res = collection.update_one(
         { 'sku': sku },
         {
             '$set': 
             {
+                'amount': newInventory.amount,
                 'itemCondition': newInventory.itemCondition,
-                'comment': newInventory.comment,
-                'link': newInventory.link,
                 'platform': newInventory.platform,
                 'shelfLocation': newInventory.shelfLocation,
-                'amount': newInventory.amount
+                'comment': newInventory.comment,
+                'link': newInventory.link,
             }
         }
     )
