@@ -1,19 +1,14 @@
-from io import BytesIO
 import os
-import json
 from time import time, ctime
-from imageController.models import InventoryImage
-from django.shortcuts import render, HttpResponse
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.core.exceptions import ResourceExistsError
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, sanitizeName, removeStr
+from CCPDController.utils import decodeJSON, get_db_client
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
-from pymongo import MongoClient
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -26,19 +21,6 @@ product_image_container = azure_blob_client.get_container_client("product-image"
 # MongoDB
 db = get_db_client()
 collection = db['InventoryImage']
-
-# sample code from Microsoft for generating user delegation sas key
-# def request_user_delegation_key(self, blob_service_client: BlobServiceClient) -> UserDelegationKey:
-#     # Get a user delegation key that's valid for 1 day
-#     delegation_key_start_time = datetime.datetime.now(datetime.timezone.utc)
-#     delegation_key_expiry_time = delegation_key_start_time + datetime.timedelta(days=1)
-
-#     user_delegation_key = blob_service_client.get_user_delegation_key(
-#         key_start_time=delegation_key_start_time,
-#         key_expiry_time=delegation_key_expiry_time
-#     )
-
-#     return user_delegation_key
 
 # download all images related to 1 sku
 @api_view(['POST'])

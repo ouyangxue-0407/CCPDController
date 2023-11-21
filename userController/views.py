@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, convertToTime
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -18,6 +18,7 @@ from userController.models import User
 # pymongo
 db = get_db_client()
 collection = db['User']
+inv_collection = db['Invitations']
 
 # jwt token expiring time
 expire_days = 14
@@ -30,6 +31,8 @@ expire_days = 14
 def checkToken(request):
     # get token
     token = request.COOKIES.get('token')
+    if not token:
+        raise AuthenticationFailed('Token Not Found')
     
     # decode and return user id
     try:
@@ -39,13 +42,15 @@ def checkToken(request):
     except jwt.ExpiredSignatureError:
         raise AuthenticationFailed('No Token')
 
-    if token:
-        user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
-        if user['userActive'] == False:
-            return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
-        if user:
-            return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
-    return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
+    # check user status
+    user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1, 'userActive': 1})
+    if not user:
+        raise AuthenticationFailed('User Not Found')
+    if user['userActive'] == False:
+        return AuthenticationFailed('User Inactive')
+    
+    # return user information
+    return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name'] }, status.HTTP_200_OK)
 
 # login any user and issue jwt
 # _id: xxx
@@ -141,18 +146,31 @@ def getUserById(request):
 @csrf_protect
 @api_view(['POST'])
 def registerUser(request):
-    # sanitization
-    body = checkBody(decodeJSON(request.body))
-    if not body:
-        return Response('Invalid registration info!', status.HTTP_400_BAD_REQUEST)
+    try:
+        # sanitize
+        body = checkBody(decodeJSON(request.body))
+        email = sanitizeEmail(body['email'])
+        pwd = sanitizePassword(body['password'])
+        # check if email exist in database
+        res = collection.find_one({ 'email': body['email'] })
+        if res:
+            return Response('Email already existed!', status.HTTP_409_CONFLICT)
+    except:
+        return Response('Invalid Registration Info', status.HTTP_400_BAD_REQUEST)
     
-    # implement invitation code later
+    if email == False or pwd == False:
+        return Response('Invalid Email Or Password', status.HTTP_400_BAD_REQUEST)
     
-    # check if email exist in database
-    res = collection.find_one({ 'email': body['email'] })
-    if res:
-        return Response('Email already existed!', status.HTTP_400_BAD_REQUEST)
+    # check if admin issues such code
+    code = inv_collection.find_one({'code': body['code']})
+    if not code:
+        return Response('Invitation Code Not Found', status.HTTP_404_NOT_FOUND)
     
+    # check if token expired
+    expTime = convertToTime(body['exp'])
+    if ((expTime - datetime.now()).total_seconds() < 0):
+        return Response('Invitation Code Expired', status.HTTP_406_NOT_ACCEPTABLE)
+        
     # construct user
     newUser = User(
         name=body['name'],

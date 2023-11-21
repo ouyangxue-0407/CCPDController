@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import jwt
@@ -36,8 +37,11 @@ min_password = 8
 max_sku = 7
 min_sku = 4
 
-# time format to convert from string to datetime
+# convert from string to datetime
+# example: Thu Oct 12 18:48:49 2023
 time_format = "%a %b %d %H:%M:%S %Y"
+def convertToTime(time_str):
+    return datetime.strptime(time_str, time_format)
 
 # check if body contains valid user registration information
 def checkBody(body):

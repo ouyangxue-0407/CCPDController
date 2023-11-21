@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
 from datetime import date, datetime, timedelta
+from .models import InvitationCode
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -20,6 +21,7 @@ from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanit
 db = get_db_client()
 user_collection = db['User']
 inventory_collection = db['Inventory']
+inv_collection = db['Invitations']
 
 # admin jwt token expiring time
 admin_expire_days = 90
@@ -99,6 +101,11 @@ def adminLogin(request):
     response.set_cookie('csrftoken', get_token(request), httponly=True)
     return response
 
+@csrf_protect
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def registerAdmin(request):
+    return Response('Registration Success')
 
 # delete user by id
 # _id: string
@@ -121,8 +128,7 @@ def deleteUserById(request):
         user_collection.delete_one({'_id': uid})
         return Response('User Deleted', status.HTTP_200_OK)
     return Response('User Not Found', status.HTTP_404_NOT_FOUND)
- 
- 
+
 #  set any user status to be active or disabled
 # _id: string,
 # password: string
@@ -153,14 +159,21 @@ def setUserActive(request):
 
 
 # admin generate invitation code for newly hired QA personal to join
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def issueInvitationCode(request):
-    
     # generate a uuid for invitation code
     inviteCode = uuid.uuid4()
     print(inviteCode)
+    
+    newCode = InvitationCode(
+        code = inviteCode,
+        available = True,
+        exp = 'like in an hour or something',
+    )
+
+    inv_collection.insert_one(newCode)
     
     return Response('Invitation Code Created: '.join(inviteCode), status.HTTP_200_OK)
 

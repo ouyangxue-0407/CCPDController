@@ -2,7 +2,7 @@ from time import time, ctime
 from datetime import datetime, timedelta
 from django.views.decorators.csrf import csrf_exempt
 from inventoryController.models import InventoryItem
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, time_format, get_client_ip
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, convertToTime, get_client_ip
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -14,7 +14,7 @@ import pymongo
 
 # pymongo
 db = get_db_client()
-collection = db['Inventory']
+qa_collection = db['Inventory']
 user_collection = db['User']
 
 # query param sku for inventory db row
@@ -33,7 +33,7 @@ def getInventoryBySku(request):
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
 
     # find the Q&A record
-    res = collection.find_one({'sku': sku}, {'_id': 0})
+    res = qa_collection.find_one({'sku': sku}, {'_id': 0})
     if not res:
         return Response('Record Not Found', status.HTTP_400_BAD_REQUEST)
     
@@ -64,7 +64,7 @@ def getInventoryByOwnerId(request):
     
     # return all inventory from owner in array
     arr = []
-    for inventory in collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING):
+    for inventory in qa_collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING):
         inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
     
@@ -75,7 +75,6 @@ def getInventoryByOwnerId(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
 def createInventory(request):
-    
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -83,7 +82,7 @@ def createInventory(request):
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
     # if sku exist return error
-    inv = collection.find_one({'sku': body['sku']})
+    inv = qa_collection.find_one({'sku': body['sku']})
     if inv:
         return Response('SKU Already Existed', status.HTTP_409_CONFLICT)
     
@@ -101,7 +100,7 @@ def createInventory(request):
     )
     
     # pymongo need dict or bson object
-    res = collection.insert_one(newInventory.__dict__)
+    res = qa_collection.insert_one(newInventory.__dict__)
     return Response('Inventory Created', status.HTTP_200_OK)
 
 # query param sku and body of new inventory info
@@ -128,15 +127,16 @@ def updateInventoryBySku(request, sku):
     try:
         # convert to object id
         body = decodeJSON(request.body)
-        sku = sanitizeSku(sku)
+        sku = sanitizeSku(int(sku))
         if not sku:
             return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+        
         # check body
         newInv = body['newInventoryInfo']
         newInventory = InventoryItem(
             time = newInv['time'],
             sku = newInv['sku'],
-            itemCondition = newInv['time'],
+            itemCondition = newInv['itemCondition'],
             comment = newInv['comment'],
             link = newInv['link'],
             platform = newInv['platform'],
@@ -148,12 +148,12 @@ def updateInventoryBySku(request, sku):
         return Response('Invalid Inventory Info', status.HTTP_406_NOT_ACCEPTABLE)
     
     # check if inventory exists
-    oldInv = collection.find_one({ 'sku': sku })
+    oldInv = qa_collection.find_one({ 'sku': sku })
     if not oldInv:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
     # update inventory
-    res = collection.update_one(
+    res = qa_collection.update_one(
         { 'sku': sku },
         {
             '$set': 
@@ -168,8 +168,10 @@ def updateInventoryBySku(request, sku):
         }
     )
     
+    # return update status 
+    if not res:
+        return Response('Update Failed', status.HTTP_404_NOT_FOUND)
     return Response('Update Success', status.HTTP_200_OK)
-
 
 # delete inventory by sku
 # QA personal can only delete record created within 24h
@@ -187,20 +189,20 @@ def deleteInventoryBySku(request):
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
     
     # pull time
-    res = collection.find_one({'sku': sku}, {'time': 1})
+    res = qa_collection.find_one({'sku': sku}, {'time': 1})
     if not res:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
 
     # calculate time left to delete, prevent delete if result delta seconds is negative
     # convert form time string to time obj
-    timeCreated = datetime.strptime(res['time'], time_format)
+    timeCreated = convertToTime(res['time'])
     one_day_later = timeCreated + timedelta(days=1)
     today = datetime.now()
     canDel = (one_day_later - today).total_seconds() > 0
     
     # perform deletion or throw error
     if canDel:
-        de = collection.delete_one({'sku': sku})
+        de = qa_collection.delete_one({'sku': sku})
         return Response('Inventory Deleted', status.HTTP_200_OK)
     return Response('Cannot Delete Inventory After 24H, Please Contact Admin', status.HTTP_403_FORBIDDEN)
