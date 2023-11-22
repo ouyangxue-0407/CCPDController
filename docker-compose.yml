@@ -1,1 +1,22 @@
-version: '3.9'
+# version: '3'
+
+# services:
+#   # Django service
+#   django:
+#     image: python:3.8
+#     container_name: django-container
+#     volumes:
+#       - /usr/src/app
+#     working_dir: /app
+#     command: bash -c "pip install -r requirements.txt && python manage.py runserver 0.0.0.0:8000"
+#     ports:
+#       - "8000:8000"
+#     depends_on:
+#       - mongo
+
+#   # MongoDB service
+#   mongo:
+#     image: mongo:latest
+#     container_name: mongo-container
+#     ports:
+#       - "27017:27017"
