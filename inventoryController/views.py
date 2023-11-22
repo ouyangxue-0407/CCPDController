@@ -51,20 +51,42 @@ def getInventoryBySku(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getInventoryByOwnerId(request):
+def getInventoryByOwnerId(request, page):
     try:
         body = decodeJSON(request.body)
+        ownerId = str(ObjectId(body['id']))
+        
+        # TODO: make limit a path parameter
+        # get targeted page
+        limit = 10
+        skip = page * limit
     except:
-        return Response('Invalid Body',status.HTTP_400_BAD_REQUEST)
+        return Response('Invalid Id', status.HTTP_400_BAD_REQUEST)
+     
+    # return all inventory from owner in array
+    arr = []
+    skip = page * limit
+    for inventory in qa_collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING).skip(skip).limit(limit):
+        inventory['_id'] = str(inventory['_id'])
+        arr.append(inventory)
+    
+    return Response(arr, status.HTTP_200_OK)
 
+
+# 
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission])
+def getInventoryInfoByOwnerId(request):
     try:
+        body = decodeJSON(request.body)
         ownerId = str(ObjectId(body['id']))
     except:
         return Response('Invalid Id', status.HTTP_400_BAD_REQUEST)
-    
+     
     # return all inventory from owner in array
     arr = []
-    for inventory in qa_collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING):
+    for inventory in qa_collection.find({ 'owner': ownerId }):
         inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
     
@@ -81,26 +103,29 @@ def createInventory(request):
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
-    # if sku exist return error
+    # if sku exist return conflict
     inv = qa_collection.find_one({'sku': body['sku']})
     if inv:
         return Response('SKU Already Existed', status.HTTP_409_CONFLICT)
     
-    # construct new inventory
-    newInventory = InventoryItem(
-        time=str(ctime(time())),
-        sku=sku,
-        itemCondition=body['itemCondition'],
-        comment=body['comment'],
-        link=body['link'],
-        platform=body['platform'],
-        shelfLocation=body['shelfLocation'],
-        amount=body['amount'],
-        owner=body['owner'],
-    )
-    
-    # pymongo need dict or bson object
-    res = qa_collection.insert_one(newInventory.__dict__)
+    try:
+        # construct new inventory
+        newInventory = InventoryItem(
+            time=str(ctime(time())),
+            sku=sku,
+            itemCondition=body['itemCondition'],
+            comment=body['comment'],
+            link=body['link'],
+            platform=body['platform'],
+            shelfLocation=body['shelfLocation'],
+            amount=body['amount'],
+            owner=body['owner'],
+            marketplace=body['marketplace']
+        )
+        # pymongo need dict or bson object
+        res = qa_collection.insert_one(newInventory.__dict__)
+    except:
+        return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
     return Response('Inventory Created', status.HTTP_200_OK)
 
 # query param sku and body of new inventory info
@@ -142,7 +167,8 @@ def updateInventoryBySku(request, sku):
             platform = newInv['platform'],
             shelfLocation = newInv['shelfLocation'],
             amount = newInv['amount'],
-            owner = newInv['owner']
+            owner = newInv['owner'],
+            marketplace = newInv['marketplace']
         )
     except:
         return Response('Invalid Inventory Info', status.HTTP_406_NOT_ACCEPTABLE)
@@ -164,6 +190,7 @@ def updateInventoryBySku(request, sku):
                 'shelfLocation': newInventory.shelfLocation,
                 'comment': newInventory.comment,
                 'link': newInventory.link,
+                'marketplace': newInventory.marketplace
             }
         }
     )

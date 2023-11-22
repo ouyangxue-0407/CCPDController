@@ -7,5 +7,5 @@ urlpatterns = [
     path("createInventory", views.createInventory, name="createInventory"),
     path("deleteInventoryBySku", views.deleteInventoryBySku, name="deleteInventoryBySku"), 
     path("updateInventoryBySku/<str:sku>", views.updateInventoryBySku, name="updateInventoryBySku"),
-    path("getInventoryByOwnerId", views.getInventoryByOwnerId, name="getInventoryByOwnerId")
+    path("getInventoryByOwnerId/<int:page>", views.getInventoryByOwnerId, name="getInventoryByOwnerId")
 ]

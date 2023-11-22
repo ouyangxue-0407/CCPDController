@@ -151,6 +151,7 @@ def registerUser(request):
         body = checkBody(decodeJSON(request.body))
         email = sanitizeEmail(body['email'])
         pwd = sanitizePassword(body['password'])
+        invCode = body['code']
         # check if email exist in database
         res = collection.find_one({ 'email': body['email'] })
         if res:
@@ -162,7 +163,7 @@ def registerUser(request):
         return Response('Invalid Email Or Password', status.HTTP_400_BAD_REQUEST)
     
     # check if admin issues such code
-    code = inv_collection.find_one({'code': body['code']})
+    code = inv_collection.find_one({'code': invCode})
     if not code:
         return Response('Invitation Code Not Found', status.HTTP_404_NOT_FOUND)
     

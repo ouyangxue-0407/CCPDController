@@ -14,9 +14,17 @@ class InventoryItem(models.Model):
     ]
     
     PLATFORM_CHOISES = [
-        ('Amazon', 'AMAZON'),
+        ('Amazon', 'Amazon'),
         ('eBay', 'eBay'),
         ('Official Website', 'Official Website'),
+        ('Other', 'Other')
+    ]
+    
+    MARKETPLACE_CHOISES = [
+        ('Hibid', 'Hibid'),
+        ('Retail', 'Retail'),
+        ('eBay', 'eBay'),
+        ('Wholesale', 'Wholesale'),
         ('Other', 'Other')
     ]
     
@@ -30,9 +38,10 @@ class InventoryItem(models.Model):
     shelfLocation: models.CharField(max_length=4)
     amount: models.IntegerField(max_length=3)
     owner: models.CharField(max_length=32)
+    marketplace: models.CharField(max_length=10, choices=MARKETPLACE_CHOISES)
     
     # constructor input all info
-    def __init__(self, time, sku, itemCondition, comment, link, platform, shelfLocation, amount, owner) -> None:
+    def __init__(self, time, sku, itemCondition, comment, link, platform, shelfLocation, amount, owner, marketplace) -> None:
         self.time = time
         self.sku = sku
         self.itemCondition=itemCondition
@@ -42,6 +51,7 @@ class InventoryItem(models.Model):
         self.shelfLocation = shelfLocation
         self.amount = amount
         self.owner = owner
+        self.marketplace = marketplace
         
     # return inventory sku
     def __str__(self) -> str:

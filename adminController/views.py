@@ -157,23 +157,30 @@ def setUserActive(request):
             return Response('Updated User Activation Status', status.HTTP_200_OK)
     return Response('User Not Found')
 
-
 # admin generate invitation code for newly hired QA personal to join
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def issueInvitationCode(request):
+    
+    
     # generate a uuid for invitation code
     inviteCode = uuid.uuid4()
     print(inviteCode)
     
+    expireTime = datetime.now() 
+    
+    
     newCode = InvitationCode(
         code = inviteCode,
         available = True,
-        exp = 'like in an hour or something',
+        exp = '',
     )
-
-    inv_collection.insert_one(newCode)
+    
+    try:
+        inv_collection.insert_one(newCode)
+    except:
+        return Response('Database Error', status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     return Response('Invitation Code Created: '.join(inviteCode), status.HTTP_200_OK)
 

@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import os
 import json
 import jwt
@@ -36,12 +36,19 @@ max_password = 70
 min_password = 8
 max_sku = 7
 min_sku = 4
+max_inv_code = 100
+min_inv_code = 10
 
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
 time_format = "%a %b %d %H:%M:%S %Y"
 def convertToTime(time_str):
     return datetime.strptime(time_str, time_format)
+
+def sanitizeInvCode(code):
+    if not isinstance(code, str):
+        return False
+    return code 
 
 # check if body contains valid user registration information
 def checkBody(body):
