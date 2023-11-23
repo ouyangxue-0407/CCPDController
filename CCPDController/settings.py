@@ -10,18 +10,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-x9@&zufge$doq71yfj!wfl*9ke=5&^+e-yjn*p+-97wz1)w)y1'
+SECRET_KEY = 'whos-your-daddy-django-insecure-x9@&zufge$doq71yfj!wfl*9ke=5&^+e-yjn*p+-97wz1)w)y1'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-ALLOWED_HOSTS = [
-    '192.168.2.62',
-    '127.0.0.1'
-]
+# ALLOWED_HOSTS = [
+#     '192.168.2.62',
+#     '127.0.0.1',
+#     '142.126.96.24',
+#     'localhost'
+# ]
+
+ALLOWED_HOSTS = ['*']
 
 # JWT Secret
-SECRET_KEY = os.getenv('JWT_SECRET')
+JWT_SECRET_KEY = os.getenv('JWT_SECRET')
 
 # Application definition
 INSTALLED_APPS = [
@@ -72,6 +76,12 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'CCPDController.wsgi.application'
 
+# https
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+# SECURE_SSL_REDIRECT = True
+SECURE_HSTS_SECONDS = 31536000
+
 # cookies setting
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = None
@@ -80,6 +90,10 @@ SESSION_COOKIE_SAMESITE = None
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
+    # "http://localhost",
+    # "https://localhost",
+    "http://142.126.96.24",
+    "https://142.126.96.24",
     "http://127.0.0.1:8100",
     "http://127.0.0.1:5173",
     "http://192.168.2.62:8100",
@@ -89,6 +103,10 @@ CORS_ALLOWED_ORIGINS = [
 # csrf stuff
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
+    # "http://localhost",
+    # "https://localhost",
+    "http://142.126.96.24",
+    "https://142.126.96.24",
     "http://127.0.0.1:8100",
     "http://127.0.0.1:5173",
     "http://192.168.2.62:8100",

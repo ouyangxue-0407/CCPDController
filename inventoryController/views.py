@@ -10,6 +10,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from bson.objectid import ObjectId
+from collections import Counter
 import pymongo
 
 # pymongo
@@ -73,10 +74,10 @@ def getInventoryByOwnerId(request, page):
     return Response(arr, status.HTTP_200_OK)
 
 
-# 
+# id: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission])
+@permission_classes([IsQAPermission | IsAdminPermission])
 def getInventoryInfoByOwnerId(request):
     try:
         body = decodeJSON(request.body)
@@ -84,13 +85,18 @@ def getInventoryInfoByOwnerId(request):
     except:
         return Response('Invalid Id', status.HTTP_400_BAD_REQUEST)
      
-    # return all inventory from owner in array
+    # array of all inventory
     arr = []
-    for inventory in qa_collection.find({ 'owner': ownerId }):
-        inventory['_id'] = str(inventory['_id'])
-        arr.append(inventory)
+    cursor = qa_collection.find({ 'owner': ownerId }, { 'itemCondition': 1 })
+    for inventory in cursor:
+        # inventory['_id'] = str(inventory['_id'])
+        arr.append(inventory['itemCondition'])
     
-    return Response(arr, status.HTTP_200_OK)
+    itemCount = Counter()
+    for condition in arr:
+        itemCount[condition] += 1 
+
+    return Response(dict(itemCount), status.HTTP_200_OK)
 
 # create single inventory Q&A record
 @api_view(['PUT'])

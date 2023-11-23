@@ -1,7 +1,8 @@
 from datetime import datetime
 import os
 import json
-import jwt
+import certifi
+import ssl
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import exceptions
@@ -10,13 +11,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # construct mongoDB client
-client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=2)
+client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=1, tlsCAFile=certifi.where())
 db_handle = client[os.getenv('DB_NAME')]
 def get_db_client():
     return db_handle
 
 # decode body from json to object
-decodeJSON = lambda body : json.loads(body.decode('utf-8'))\
+decodeJSON = lambda body : json.loads(body.decode('utf-8'))
 
 # get client ip address
 def get_client_ip(request):

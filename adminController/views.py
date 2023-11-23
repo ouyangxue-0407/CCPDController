@@ -36,7 +36,7 @@ def checkAdminToken(request):
     
     # decode and return user id
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms='HS256')
     except jwt.DecodeError or UnicodeError:
         raise AuthenticationFailed('Invalid token')
     except jwt.ExpiredSignatureError:
@@ -85,7 +85,7 @@ def adminLogin(request):
         }
         
         # construct tokent and return it
-        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
     except:
         return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
 

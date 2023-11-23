@@ -36,7 +36,7 @@ def checkToken(request):
     
     # decode and return user id
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms='HS256')
     except jwt.DecodeError or UnicodeError:
         raise AuthenticationFailed('Invalid token')
     except jwt.ExpiredSignatureError:
@@ -54,7 +54,6 @@ def checkToken(request):
 
 # login any user and issue jwt
 # _id: xxx
-@csrf_protect
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
@@ -88,7 +87,7 @@ def login(request):
         }
         
         # construct tokent and return it
-        token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+        token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
     except:
         return Response('Failed to Generate Token', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -167,10 +166,10 @@ def registerUser(request):
     if not code:
         return Response('Invitation Code Not Found', status.HTTP_404_NOT_FOUND)
     
-    # check if token expired
-    expTime = convertToTime(body['exp'])
-    if ((expTime - datetime.now()).total_seconds() < 0):
-        return Response('Invitation Code Expired', status.HTTP_406_NOT_ACCEPTABLE)
+    # # check if token expired
+    # expTime = convertToTime(body['exp'])
+    # if ((expTime - datetime.now()).total_seconds() < 0):
+    #     return Response('Invitation Code Expired', status.HTTP_406_NOT_ACCEPTABLE)
         
     # construct user
     newUser = User(

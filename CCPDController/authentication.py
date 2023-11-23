@@ -48,7 +48,7 @@ class JWTAuthentication(TokenAuthentication):
                 raise AuthenticationFailed('No token provided')
             
             # decode jwt and retrive user id
-            payload = jwt.decode(raw_token, settings.SECRET_KEY, algorithms='HS256')
+            payload = jwt.decode(raw_token, settings.JWT_SECRET_KEY, algorithms='HS256')
         
         except jwt.DecodeError or UnicodeError:
             raise AuthenticationFailed('Invalid token')
