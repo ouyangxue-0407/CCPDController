@@ -56,15 +56,17 @@ def checkToken(request):
 # _id: xxx
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def login(request):
-    body = decodeJSON(request.body)
+def login(request): 
+    try:
+        body = decodeJSON(request.body)
+        # sanitize
+        email = sanitizeEmail(body['email'])
+        password = sanitizePassword(body['password'])
+        if email == False or password == False:
+            return Response('Invalid Email Or Password', status.HTTP_400_BAD_REQUEST)
+    except:
+        return Response('Invalid Login Info', status.HTTP_400_BAD_REQUEST)
 
-    # sanitize
-    email = sanitizeEmail(body['email'])
-    password = sanitizePassword(body['password'])
-    if email == False or password == False:
-        return Response('Invalid Login Information', status.HTTP_400_BAD_REQUEST)
-    
     # check if user exist
     # only retrive user status and role
     user = collection.find_one({

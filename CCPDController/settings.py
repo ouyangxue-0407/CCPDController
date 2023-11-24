@@ -79,7 +79,7 @@ WSGI_APPLICATION = 'CCPDController.wsgi.application'
 # https
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-# SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = False    # http -> https 
 SECURE_HSTS_SECONDS = 31536000
 
 # cookies setting
@@ -90,27 +90,31 @@ SESSION_COOKIE_SAMESITE = None
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
+    'http://172.18.208.1',
+    'https://172.18.208.1',
     # "http://localhost",
     # "https://localhost",
-    "http://142.126.96.24",
-    "https://142.126.96.24",
-    "http://127.0.0.1:8100",
-    "http://127.0.0.1:5173",
-    "http://192.168.2.62:8100",
-    "http://192.168.2.62:5173",
+    # "http://142.126.96.24",
+    # "https://142.126.96.24",
+    # "http://127.0.0.1:8100",
+    # "http://127.0.0.1:5173",
+    # "http://192.168.2.62:8100",
+    # "http://192.168.2.62:5173",
 ]
 
 # csrf stuff
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
+    'http://172.18.208.1',
+    'https://172.18.208.1',
     # "http://localhost",
     # "https://localhost",
-    "http://142.126.96.24",
-    "https://142.126.96.24",
-    "http://127.0.0.1:8100",
-    "http://127.0.0.1:5173",
-    "http://192.168.2.62:8100",
-    "http://192.168.2.62:5173",
+    # "http://142.126.96.24",
+    # "https://142.126.96.24",
+    # "http://127.0.0.1:8100",
+    # "http://127.0.0.1:5173",
+    # "http://192.168.2.62:8100",
+    # "http://192.168.2.62:5173",
 ]
 
 # Django rest framework

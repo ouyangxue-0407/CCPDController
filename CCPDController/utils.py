@@ -1,8 +1,6 @@
 from datetime import datetime
 import os
 import json
-import certifi
-import ssl
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import exceptions
@@ -11,7 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # construct mongoDB client
-client = MongoClient(os.getenv('DATABASE_URL'), maxPoolSize=1, tlsCAFile=certifi.where())
+# ssl hand shake error because ip not whitelisted
+client = MongoClient(
+    os.getenv('DATABASE_URL'), 
+    maxPoolSize=1
+)
 db_handle = client[os.getenv('DB_NAME')]
 def get_db_client():
     return db_handle
