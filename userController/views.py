@@ -32,7 +32,8 @@ def checkToken(request):
     # get token
     token = request.COOKIES.get('token')
     if not token:
-        raise AuthenticationFailed('Token Not Found')
+        # raise AuthenticationFailed('Token Not Found')
+        return
     
     # decode and return user id
     try:
@@ -81,6 +82,7 @@ def login(request):
         return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
 
     try:
+        expire = datetime.utcnow() + timedelta(days=expire_days)
         # construct payload
         payload = {
             'id': str(ObjectId(user['_id'])),
@@ -101,8 +103,9 @@ def login(request):
 
     # construct response store jwt token in http only cookie
     response = Response(info, status.HTTP_200_OK)
-    response.set_cookie('token', token, httponly=True)
-    response.set_cookie('csrftoken', get_token(request), httponly=True)
+    # cookie wont show unless sets samesite to string "None" and secure to True
+    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
+    response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire)
     return response
 
 # get user information without password
@@ -227,8 +230,8 @@ def logout(request):
     response = Response('User Logout', status.HTTP_200_OK)
     try:
         # delete jwt token and csrf token
-        response.delete_cookie('token')
-        response.delete_cookie('csrftoken')
+        response.delete_cookie('token', path="/")
+        response.delete_cookie('csrftoken', path="/")
     except:
         return Response('Token Not Found', status.HTTP_404_NOT_FOUND)
     return response
