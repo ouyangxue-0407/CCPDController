@@ -3,6 +3,7 @@ from . import views
 
 # define all routes
 urlpatterns = [
+    path('getTime', views.getTime, name="getTime"),
     path('checkToken', views.checkToken, name="checkToken"),
     path('login', views.login, name="login"),
     path("registerUser", views.registerUser, name="registerUser"),

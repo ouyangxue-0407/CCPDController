@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, convertToTime
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -22,6 +22,12 @@ inv_collection = db['Invitations']
 
 # jwt token expiring time
 expire_days = 14
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def getTime(request):
+    print(get_client_ip(request))
+    return Response(str(datetime.now()))
 
 # will be called every time on open app
 @csrf_protect

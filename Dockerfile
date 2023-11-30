@@ -13,15 +13,15 @@ RUN pip install --upgrade pip
 COPY ./requirements.txt /usr/src/app
 RUN pip install -r requirements.txt
 
-# Copy the SSL certificate files into the image
-COPY certs/cert.pem /usr/local/share/ca-certificates/cert.pem
-COPY certs/key.pem /usr/local/share/ca-certificates/key.pem
-
-RUN update-ca-certificates
-
 # copy project
 COPY . /usr/src/app
 
+# Copy the SSL certificate files into the image
+# COPY certs/certificate.pem /usr/local/share/ca-certificates/certificate.pem
+# COPY certs/key.pem /usr/local/share/ca-certificates/key.pem
+# COPY certs/ccpowerdeals.ca.crt /usr/local/share/ca-certificates/
+# RUN update-ca-certificates
+
 EXPOSE 8000
 
-CMD [ "python", "manage.py", "runserver_plus", "0.0.0.0:8000", "--cert-file", "certs/cert.pem", "--key-file", "certs/key.pem" ]
+CMD [ "python", "manage.py", "runserver_plus", "0.0.0.0:8000" ]
