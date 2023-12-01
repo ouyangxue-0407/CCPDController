@@ -73,14 +73,15 @@ def adminLogin(request):
         return Response('Login Failed', status.HTTP_404_NOT_FOUND)
     if bool(user['userActive']) == False:
         return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
-    if (user['role'] != 'Admin'):
+    if user['role'] != 'Admin':
         return Response('Permission Denied', status.HTTP_403_FORBIDDEN)
 
     try:
         # construct payload
+        expire = datetime.utcnow() + timedelta(days=admin_expire_days)
         payload = {
             'id': str(ObjectId(user['_id'])),
-            'exp': datetime.utcnow() + timedelta(days=admin_expire_days),
+            'exp': expire,
             'iat': datetime.utcnow()
         }
         
@@ -97,8 +98,8 @@ def adminLogin(request):
 
     # construct response store jwt token in http only cookie
     response = Response(info, status.HTTP_200_OK)
-    response.set_cookie('token', token, httponly=True)
-    response.set_cookie('csrftoken', get_token(request), httponly=True)
+    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True)
+    response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire, samesite="None", secure=True)
     return response
 
 @csrf_protect

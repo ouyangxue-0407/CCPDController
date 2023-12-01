@@ -236,8 +236,10 @@ def logout(request):
     response = Response('User Logout', status.HTTP_200_OK)
     try:
         # delete jwt token and csrf token
-        response.delete_cookie('token', path="/")
-        response.delete_cookie('csrftoken', path="/")
+        # response.delete_cookie('token', path="/")
+        # response.delete_cookie('csrftoken', path="/")
+        response.set_cookie('token', expires=0, max_age=0, secure=True, samesite='none')
+        response.set_cookie('csrftoken', expires=0, max_age=0, secure=True, samesite='none')
     except:
         return Response('Token Not Found', status.HTTP_404_NOT_FOUND)
     return response
