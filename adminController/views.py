@@ -225,3 +225,13 @@ def getAllInventory(request):
         inv.append(item)
     
     return Response(inv, status.HTTP_200_OK)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllUserInfo(request): 
+    arr = []
+    for item in inventory_collection.find({}, {'_id': 0, 'password': 0 }):
+        arr.push(item)
+        
+    return Response(arr, status.HTTP_200_OK)
