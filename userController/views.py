@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip, sanitizeInvitationCode, sanitizeName
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -156,37 +156,44 @@ def getUserById(request):
 @csrf_protect
 @api_view(['POST'])
 def registerUser(request):
+    body = checkBody(decodeJSON(request.body))
     try:
         # sanitize
-        body = checkBody(decodeJSON(request.body))
         email = sanitizeEmail(body['email'])
-        pwd = sanitizePassword(body['password'])
-        invCode = body['code']
+        userName = sanitizeName(body['name'])
+        password = sanitizePassword(body['password'])
+        invCode = sanitizeInvitationCode(body['code'])
+        print(email)
+        print(userName)
+        print(password)
+        print(invCode)
         # check if email exist in database
         res = collection.find_one({ 'email': body['email'] })
         if res:
             return Response('Email already existed!', status.HTTP_409_CONFLICT)
+        if email == False or password == False or invCode == False:
+            return Response('Invalid Registration Info', status.HTTP_400_BAD_REQUEST)
     except:
-        return Response('Invalid Registration Info', status.HTTP_400_BAD_REQUEST)
-    
-    if email == False or pwd == False:
-        return Response('Invalid Email Or Password', status.HTTP_400_BAD_REQUEST)
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
     # check if admin issues such code
     code = inv_collection.find_one({'code': invCode})
     if not code:
-        return Response('Invitation Code Not Found', status.HTTP_404_NOT_FOUND)
+        return Response('Invilid Invitation Code', status.HTTP_404_NOT_FOUND)
     
-    # # check if token expired
+    print(code)
+    print((code['exp']))
+    
+    # check if token expired
     # expTime = convertToTime(body['exp'])
     # if ((expTime - datetime.now()).total_seconds() < 0):
     #     return Response('Invitation Code Expired', status.HTTP_406_NOT_ACCEPTABLE)
         
     # construct user
     newUser = User(
-        name=body['name'],
-        email=body['email'],
-        password=body['password'],
+        name=userName,
+        email=email,
+        password=password,
         role='QAPersonal',
         registrationDate=date.today().isoformat(),
         userActive=True
@@ -236,8 +243,6 @@ def logout(request):
     response = Response('User Logout', status.HTTP_200_OK)
     try:
         # delete jwt token and csrf token
-        # response.delete_cookie('token', path="/")
-        # response.delete_cookie('csrftoken', path="/")
         response.set_cookie('token', expires=0, max_age=0, secure=True, samesite='none')
         response.set_cookie('csrftoken', expires=0, max_age=0, secure=True, samesite='none')
     except:

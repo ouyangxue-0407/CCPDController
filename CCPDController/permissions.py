@@ -20,7 +20,7 @@ class IsQAPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         # mongo db query
         # grant if user is qa personal and user is active
-        if request.auth == 'QAPersonal' and request.user['userActive'] == True:
+        if request.auth == 'QAPersonal' and bool(request.user['userActive']) == True:
             return True
 
 # admin permission
@@ -28,6 +28,12 @@ class IsAdminPermission(permissions.BasePermission):
     message = 'Permission Denied, Admin Only!'
     def has_permission(self, request, view):
         if request.auth == 'Admin' and bool(request.user['userActive']) == True :
+            return True
+
+class IsSuperAdmin(permissions.BasePermission):
+    message = 'Permission Denied, Super Admin Only!'
+    def has_permission(self, request, view):
+        if request.auth == 'SAdmin':
             return True
 
 # user blocked by IP black list

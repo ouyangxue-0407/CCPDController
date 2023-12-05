@@ -1,17 +1,16 @@
 import jwt
 import uuid
-import json
 from django.conf import settings
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from .models import InvitationCode
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
@@ -21,7 +20,7 @@ from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanit
 db = get_db_client()
 user_collection = db['User']
 inventory_collection = db['Inventory']
-inv_collection = db['Invitations']
+inv_code_collection = db['Invitations']
 
 # admin jwt token expiring time
 admin_expire_days = 90
@@ -158,35 +157,8 @@ def setUserActive(request):
             return Response('Updated User Activation Status', status.HTTP_200_OK)
     return Response('User Not Found')
 
-# admin generate invitation code for newly hired QA personal to join
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def issueInvitationCode(request):
-    
-    
-    # generate a uuid for invitation code
-    inviteCode = uuid.uuid4()
-    print(inviteCode)
-    
-    expireTime = datetime.now() 
-    
-    
-    newCode = InvitationCode(
-        code = inviteCode,
-        available = True,
-        exp = '',
-    )
-    
-    try:
-        inv_collection.insert_one(newCode)
-    except:
-        return Response('Database Error', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    return Response('Invitation Code Created: '.join(inviteCode), status.HTTP_200_OK)
-
 # update anyones password by id
-# _id: string
+# id: string
 # newpassword: string
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
@@ -195,12 +167,12 @@ def updatePasswordById(request):
     try:
         # if failed to convert to BSON response 401
         body = decodeJSON(request.body)
-        uid = ObjectId(body['_id'])
+        uid = ObjectId(body['id'])
     except:
         return Response('User ID Invalid:', status.HTTP_400_BAD_REQUEST)
     
     # query db for user
-    res = user_collection.find_one({ '_id': uid })
+    res = user_collection.find_one({ 'id': uid })
     
     # check if password is valid
     if not sanitizePassword(body['password']):
@@ -209,7 +181,7 @@ def updatePasswordById(request):
     # if found, change its pass word
     if res:
         user_collection.update_one(
-            { '_id': uid }, 
+            { 'id': uid }, 
             { '$set': {'password': body['password']} }
         )
         return Response('Password Updated', status.HTTP_200_OK)
@@ -223,15 +195,58 @@ def getAllInventory(request):
     inv = []
     for item in inventory_collection.find({}, {'_id': 0}):
         inv.append(item)
-    
     return Response(inv, status.HTTP_200_OK)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllUserInfo(request): 
-    arr = []
-    for item in inventory_collection.find({}, {'_id': 0, 'password': 0 }):
-        arr.push(item)
-        
-    return Response(arr, status.HTTP_200_OK)
+def getAllUserInfo(request):
+    userArr = []
+    for item in user_collection.find({}, {'password': 0, '_id': 0}):
+        userArr.append(item)
+    return Response(userArr, status.HTTP_200_OK)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllInvitationCode(request): 
+    codeArr = []
+    for item in inv_code_collection.find({}, {'_id': 0}):
+        codeArr.append(item)
+    return Response(codeArr, status.HTTP_200_OK)
+
+# admin generate invitation code for newly hired QA personal to join
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def issueInvitationCode(request):
+    # generate a uuid for invitation code
+    inviteCode = uuid.uuid4()
+    expireTime = datetime.now() + timedelta(days=1)
+    newCode = InvitationCode(
+        code = str(inviteCode),
+        exp = expireTime,
+    )
+    
+    try:
+        res = inv_code_collection.insert_one(newCode.__dict__)
+    except:
+        return Response('Server Error', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    return Response('Invitation Code Created', status.HTTP_200_OK)
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def deleteInvitationCode(request):
+    try:
+        body = decodeJSON(request.body)
+        code = body['code']
+    except:
+        return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        res = inv_code_collection.delete_one({'code': code})
+    except:
+        return Response('Delete Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Code Deleted!', status.HTTP_200_OK)

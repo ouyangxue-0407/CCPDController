@@ -31,7 +31,7 @@ def get_client_ip(request):
     return ip
 
 # limit variables
-max_name = 40
+max_name = 50
 min_name = 3
 max_email = 45
 min_email = 6
@@ -124,8 +124,17 @@ def sanitizePassword(password):
 def sanitizePlatform(platform):
     if platform not in ['Amazon', 'eBay', 'Official Website', 'Other']:
         return False
+    return platform
 
 # shelf location sanitize
 def sanitizeShelfLocation(shelfLocation):
     if not isinstance(shelfLocation, str):
         return False
+    return shelfLocation
+
+def sanitizeInvitationCode(code):
+    if not isinstance(code, str):
+        return False
+    if not inRange(code, min_inv_code, max_inv_code):
+        return False
+    return code
