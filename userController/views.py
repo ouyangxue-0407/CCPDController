@@ -163,10 +163,7 @@ def registerUser(request):
         userName = sanitizeName(body['name'])
         password = sanitizePassword(body['password'])
         invCode = sanitizeInvitationCode(body['code'])
-        print(email)
-        print(userName)
-        print(password)
-        print(invCode)
+
         # check if email exist in database
         res = collection.find_one({ 'email': body['email'] })
         if res:

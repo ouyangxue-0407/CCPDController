@@ -93,23 +93,25 @@ CSRF_COOKIE_SAMESITE = 'None'
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True
 # CORS_ALLOWED_ORIGINS = [
-#     'http://172.18.208.1',
-#     'https://172.18.208.1',
-#     "http://localhost:5173",
-#     "https://localhost:5173",
-#     "http://142.126.96.24",
-#     "https://142.126.96.24",
-#     "http://127.0.0.1:8100",
-#     "http://127.0.0.1:5173",
-#     "http://192.168.2.62:8100",
-#     "http://192.168.2.62:5173",
+    # "http://192.168.56.1:8100",
+    # "http://192.168.56.1:5173",
+    # 'http://172.18.208.1',
+    # 'https://172.18.208.1',
+    # "http://localhost:5173",
+    # "https://localhost:5173",
+    # "http://142.126.96.24",
+    # "https://142.126.96.24",
+    # "http://127.0.0.1:8100",
+    # "http://127.0.0.1:5173",
+    # "http://192.168.2.62:8100",
+    # "http://192.168.2.62:5173",
 # ]
 
 # csrf settings
 CSRF_COOKIE_HTTPONLY = True
 CSRF_TRUSTED_ORIGINS = [
-    'http://172.18.208.1',
-    'https://172.18.208.1',
+    # 'http://172.18.208.1',
+    # 'https://172.18.208.1',
     # "http://localhost",
     # "https://localhost",
     # "http://142.126.96.24",

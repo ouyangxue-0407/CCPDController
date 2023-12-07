@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
+from userController.models import User
 from .models import InvitationCode
 from rest_framework import status
 from rest_framework.response import Response
@@ -14,7 +15,7 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeName
 
 # pymongo
 db = get_db_client()
@@ -108,7 +109,7 @@ def registerAdmin(request):
     return Response('Registration Success')
 
 # delete user by id
-# _id: string
+# id: string
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
@@ -116,7 +117,7 @@ def deleteUserById(request):
     try:
         # convert to BSON
         body = decodeJSON(request.body)
-        uid = ObjectId(body['_id'])
+        uid = ObjectId(body['id'])
     except:
         return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
     
@@ -130,17 +131,16 @@ def deleteUserById(request):
     return Response('User Not Found', status.HTTP_404_NOT_FOUND)
 
 #  set any user status to be active or disabled
-# _id: string,
-# password: string
+# id: string,
 # userActive: bool
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def setUserActive(request):
+def setUserActiveById(request):
     try:
         # convert to BSON
         body = decodeJSON(request.body)
-        uid = ObjectId(body['_id'])
+        uid = ObjectId(body['id'])
     except:
         return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
     
@@ -188,6 +188,63 @@ def updatePasswordById(request):
     return Response('User Not Found', status.HTTP_404_NOT_FOUND)
 
 
+# update user information by id
+# id: string
+# body: UserDetail
+@api_view(['PUT'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def updateUserById(request, uid):
+    try:
+        # if failed to convert to BSON response 401
+        body = decodeJSON(request.body)
+        userId = ObjectId(uid)
+
+        # if user not in db throw 404
+        res = user_collection.find_one({ 'id': userId })
+        if not res:
+            return Response('User Not Found', status.HTTP_404_NOT_FOUND)
+        
+        # remove all "$" and ensure no object {} passed in here
+        email = sanitizeEmail(body['email'])
+        name = sanitizeName(body['name'])
+        password = sanitizePassword(body['password'])
+        
+        if email == False or name == False or password == False:
+            return Response('User Info Invalid', status.HTTP_400_BAD_REQUEST)
+        
+        # run new info through object relational mapping
+        newUserInfo = User (
+            name=name,
+            email=email,
+            role=body['role'],
+            password=password,
+            registrationDate=res['registrationDate'],
+            userActive=body['userActive']
+        )
+    except:
+        return Response('User Info Invalid:', status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # if found, update its info
+        user_collection.update_one(
+            { 'id': userId }, 
+            {
+                '$set': {
+                    'name': newUserInfo['name'],
+                    'email': newUserInfo['email'],
+                    'role': newUserInfo['role'],
+                    'password': newUserInfo['password'],
+                    'registrationDate': newUserInfo['registrationDate'],
+                    'userActive': newUserInfo['userActive']
+                }
+            }
+        )
+    except:
+        return Response('Update User Info Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Password Updated', status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
@@ -202,7 +259,8 @@ def getAllInventory(request):
 @permission_classes([IsAdminPermission])
 def getAllUserInfo(request):
     userArr = []
-    for item in user_collection.find({}, {'password': 0, '_id': 0}):
+    for item in user_collection.find({}, {'password': 0}):
+        item['_id'] = str(item['_id'])
         userArr.append(item)
     return Response(userArr, status.HTTP_200_OK)
 
