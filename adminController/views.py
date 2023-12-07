@@ -222,7 +222,7 @@ def getAllInvitationCode(request):
 def issueInvitationCode(request):
     # generate a uuid for invitation code
     inviteCode = uuid.uuid4()
-    expireTime = datetime.now() + timedelta(days=1)
+    expireTime = (datetime.now() + timedelta(days=1)).timestamp()
     newCode = InvitationCode(
         code = str(inviteCode),
         exp = expireTime,
@@ -232,7 +232,6 @@ def issueInvitationCode(request):
         res = inv_code_collection.insert_one(newCode.__dict__)
     except:
         return Response('Server Error', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
     return Response('Invitation Code Created', status.HTTP_200_OK)
 
 @api_view(['DELETE'])

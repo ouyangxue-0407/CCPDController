@@ -178,11 +178,11 @@ def registerUser(request):
     
     # check if admin issues such code
     code = inv_collection.find_one({'code': invCode})
-    if not code:
-        return Response('Invilid Invitation Code', status.HTTP_404_NOT_FOUND)
+    if not code: #or expired:
+        return Response('Code invalid', status.HTTP_404_NOT_FOUND)
     
-    print(code)
-    print((code['exp']))
+    print(code['exp'])
+    print(datetime.now().timestamp() - code['exp'])
     
     # check if token expired
     # expTime = convertToTime(body['exp'])
@@ -203,6 +203,7 @@ def registerUser(request):
     res = collection.insert_one(newUser.__dict__)
 
     if res:
+        inv_collection.delete_one({'code': invCode})
         return Response('Registration Successful', status.HTTP_200_OK)
     return Response('Registration Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
