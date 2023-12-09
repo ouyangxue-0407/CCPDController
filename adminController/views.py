@@ -195,53 +195,68 @@ def updatePasswordById(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def updateUserById(request, uid):
-    try:
-        # if failed to convert to BSON response 401
-        body = decodeJSON(request.body)
-        userId = ObjectId(uid)
+    # try:
+    # if failed to convert to BSON response 401
+    body = decodeJSON(request.body)
+    userId = ObjectId(uid)
 
-        # if user not in db throw 404
-        res = user_collection.find_one({ 'id': userId })
-        if not res:
-            return Response('User Not Found', status.HTTP_404_NOT_FOUND)
-        
-        # remove all "$" and ensure no object {} passed in here
-        email = sanitizeEmail(body['email'])
-        name = sanitizeName(body['name'])
-        password = sanitizePassword(body['password'])
-        
-        if email == False or name == False or password == False:
-            return Response('User Info Invalid', status.HTTP_400_BAD_REQUEST)
-        
-        # run new info through object relational mapping
-        newUserInfo = User (
-            name=name,
-            email=email,
-            role=body['role'],
-            password=password,
-            registrationDate=res['registrationDate'],
-            userActive=body['userActive']
-        )
-    except:
-        return Response('User Info Invalid:', status.HTTP_400_BAD_REQUEST)
+    # if user not in db throw 404
+    res = user_collection.find_one({ '_id': userId })
+    if not res:
+        return Response('User Not Found', status.HTTP_404_NOT_FOUND)
     
+    # if password not passed in, use the old pass for the new object
     try:
-        # if found, update its info
-        user_collection.update_one(
-            { 'id': userId }, 
-            {
-                '$set': {
-                    'name': newUserInfo['name'],
-                    'email': newUserInfo['email'],
-                    'role': newUserInfo['role'],
-                    'password': newUserInfo['password'],
-                    'registrationDate': newUserInfo['registrationDate'],
-                    'userActive': newUserInfo['userActive']
-                }
+        body['password'] = sanitizePassword(body['password'])
+    except: 
+        body['password'] = res['password']
+    
+    # remove all "$" and ensure no object {} passed in here
+    body['email'] = sanitizeEmail(body['email'])
+    body['name'] = sanitizeName(body['name'])
+
+    print('user before modification:')
+    print(res)
+    print('req body:')
+    print(body)
+    
+    print(body['email'])
+    print(body['name'])
+    
+    if body['email'] == False or body['name'] == False or body['password'] == False:
+        return Response('User Info Invalid', status.HTTP_400_BAD_REQUEST)
+    
+    # run new info through object relational mapping
+    newUserInfo = User (
+        name=body['name'],
+        email=body['email'],
+        role=body['role'],
+        password=body['password'],
+        registrationDate=res['registrationDate'],
+        userActive=body['userActive']
+    )
+    # except:
+    #     return Response('User Info Invalid:', status.HTTP_400_BAD_REQUEST)
+    
+    # try:
+    # if found, update its info
+    print(newUserInfo)
+    
+    user_collection.update_one(
+        { 'id': userId }, 
+        {
+            '$set': {
+                'name': newUserInfo.name,
+                'email': newUserInfo.email,
+                'role': newUserInfo.role,
+                'password': newUserInfo.password,
+                'registrationDate': newUserInfo.registrationDate,
+                'userActive': newUserInfo.userActive
             }
-        )
-    except:
-        return Response('Update User Info Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }
+    )
+    # except:
+    #     return Response('Update User Info Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Password Updated', status.HTTP_200_OK)
 
 

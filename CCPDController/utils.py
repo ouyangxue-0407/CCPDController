@@ -132,6 +132,7 @@ def sanitizeShelfLocation(shelfLocation):
         return False
     return shelfLocation
 
+# invitation code should be a string
 def sanitizeInvitationCode(code):
     if not isinstance(code, str):
         return False

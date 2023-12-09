@@ -1,3 +1,4 @@
+import time
 import jwt
 from django.conf import settings
 from django.shortcuts import HttpResponse
@@ -10,7 +11,7 @@ from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import AllowAny
-from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import status
 from rest_framework.response import Response
 from userController.models import User
@@ -173,18 +174,17 @@ def registerUser(request):
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
-    # check if admin issues such code
+    # check if code is in db
     code = inv_collection.find_one({'code': invCode})
-    if not code: #or expired:
+    if not code:
         return Response('Code invalid', status.HTTP_404_NOT_FOUND)
     
-    print(code['exp'])
-    print(datetime.now().timestamp() - code['exp'])
+    # get today's unix float
+    today = time.mktime(datetime.now().timetuple())
     
     # check if token expired
-    # expTime = convertToTime(body['exp'])
-    # if ((expTime - datetime.now()).total_seconds() < 0):
-    #     return Response('Invitation Code Expired', status.HTTP_406_NOT_ACCEPTABLE)
+    if (bool(code['exp'] - today < 0)):
+        return Response('Invitation Code Expired', status.HTTP_410_GONE)
         
     # construct user
     newUser = User(
