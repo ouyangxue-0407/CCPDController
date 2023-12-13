@@ -22,7 +22,7 @@ collection = db['User']
 inv_collection = db['Invitations']
 
 # jwt token expiring time
-expire_days = 14
+expire_days = 30
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

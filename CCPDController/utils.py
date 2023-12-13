@@ -41,17 +41,14 @@ max_sku = 7
 min_sku = 4
 max_inv_code = 100
 min_inv_code = 10
+max_role = 12
+min_role = 4
 
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
 time_format = "%a %b %d %H:%M:%S %Y"
 def convertToTime(time_str):
     return datetime.strptime(time_str, time_format)
-
-def sanitizeInvCode(code):
-    if not isinstance(code, str):
-        return False
-    return code 
 
 # check if body contains valid user registration information
 def checkBody(body):
@@ -101,6 +98,14 @@ def sanitizeName(name):
         return False
     return clean_name
 
+# role length from 4 to 12
+def sanitizeRole(role):
+    if not isinstance(role, str):
+        return False
+    if not inRange(role, min_role, max_role):
+        return False
+    return role
+
 # email can be from 7 chars to 40 chars
 def sanitizeEmail(email):
     # type and format check
@@ -139,3 +144,19 @@ def sanitizeInvitationCode(code):
     if not inRange(code, min_inv_code, max_inv_code):
         return False
     return code
+
+# make sure string is type str and no $ included 
+def sanitizeString(field):
+    if not isinstance(field, str):
+        raise TypeError('Invalid Information')
+    return field.replace('$', '')
+
+# sanitize all field in user info body
+def sanitizeBody(body):
+    for attr, value in body.items():
+        # if hit user active field set the field to bool type
+        # if not sanitize string and remove '$'
+        if attr == 'userActive':
+            body[attr] = bool(value == 'true')
+        else:
+            body[attr] = sanitizeString(value)
