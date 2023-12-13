@@ -74,6 +74,7 @@ def getInventoryByOwnerId(request, page):
     return Response(arr, status.HTTP_200_OK)
 
 
+# for charts and overview data
 # id: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])

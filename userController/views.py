@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip, sanitizeInvitationCode, sanitizeName
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip, sanitizeInvitationCode, sanitizeName, user_time_format
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -192,7 +192,7 @@ def registerUser(request):
         email=email,
         password=password,
         role='QAPersonal',
-        registrationDate=date.today().isoformat(),
+        registrationDate=date.today().strftime(user_time_format),
         userActive=True
     )
     
@@ -201,7 +201,7 @@ def registerUser(request):
 
     if res:
         inv_collection.delete_one({'code': invCode})
-        return Response('Registration Successful', status.HTTP_200_OK)
+        return Response('Registration Successful', status.HTTP_201_CREATED)
     return Response('Registration Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # QA personal change own password

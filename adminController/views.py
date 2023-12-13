@@ -5,7 +5,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from userController.models import User
 from .models import InvitationCode
 from rest_framework import status
@@ -15,7 +15,7 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeBody
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeBody, user_time_format
 
 # pymongo
 db = get_db_client()
@@ -110,14 +110,24 @@ def createUser(request):
     try:
         body = decodeJSON(request.body)
         sanitizeBody(body)
+        newUser = User (
+            name=body['name'],
+            email=body['email'],
+            password=body['password'],
+            role=body['role'],
+            registrationDate=date.today().strftime(user_time_format),
+            userActive=True
+        )
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
-    print(body)
-    # res = user_collection.insert_one(body)
+    print(newUser)
     
-    
-    return Response('User Created')
+    try:
+        user_collection.insert_one(newUser.__dict__)
+    except:
+        return Response('Unable to Create User', status.HTTP_400_BAD_REQUEST)
+    return Response('User Created', status.HTTP_201_CREATED)
 
 # delete user by id
 # id: string
@@ -140,33 +150,6 @@ def deleteUserById(request):
         user_collection.delete_one({'_id': uid})
         return Response('User Deleted', status.HTTP_200_OK)
     return Response('User Not Found', status.HTTP_404_NOT_FOUND)
-
-#  set any user status to be active or disabled
-# id: string,
-# userActive: bool
-@api_view(['PUT'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def setUserActiveById(request):
-    try:
-        # convert to BSON
-        body = decodeJSON(request.body)
-        uid = ObjectId(body['id'])
-    except:
-        return Response('Invalid User ID', status.HTTP_400_BAD_REQUEST)
-    
-    # query db for user
-    res = user_collection.find_one({'_id': uid})
-    
-    # if found, switch user active to false
-    if res :
-        res = user_collection.update_one(
-            { '_id': uid }, 
-            { '$set': {'userActive': body['userActive']} }
-        )
-        if res:
-            return Response('Updated User Activation Status', status.HTTP_200_OK)
-    return Response('User Not Found')
 
 # update user information by id
 # id: string

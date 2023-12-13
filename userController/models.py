@@ -7,6 +7,7 @@ class User(models.Model):
         ('Super Admin', 'Super Admin'),
         ('QAPersonal', 'QAPersonal'),
         ('Sales', 'Sales'),
+        ('Shelving Manager', 'Shelving Manager'),
     ]
     
     _id: models.AutoField(primary_key=True)

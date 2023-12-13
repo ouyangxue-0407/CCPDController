@@ -7,7 +7,6 @@ urlpatterns = [
     path('adminLogin', views.adminLogin, name='adminLogin'),
     path('createUser', views.createUser, name='createUser'),
     path('deleteUserById', views.deleteUserById, name="deleteUserById"),
-    path('setUserActiveById', views.setUserActiveById, name="setUserActiveById"),
     path('updateUserById/<str:uid>', views.updateUserById, name="updateUserById"),
     path('issueInvitationCode', views.issueInvitationCode, name="issueInvitationCode"),
     path('getAllInventory', views.getAllInventory, name="getAllInventory"),

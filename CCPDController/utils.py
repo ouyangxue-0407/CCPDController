@@ -44,9 +44,12 @@ min_inv_code = 10
 max_role = 12
 min_role = 4
 
+# user format
+user_time_format = "%b %-d %Y"
+# inventory and invitation code format
+time_format = "%a %b %d %H:%M:%S %Y"
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
-time_format = "%a %b %d %H:%M:%S %Y"
 def convertToTime(time_str):
     return datetime.strptime(time_str, time_format)
 
@@ -152,6 +155,7 @@ def sanitizeString(field):
     return field.replace('$', '')
 
 # sanitize all field in user info body
+# make sure user is active and remove $
 def sanitizeBody(body):
     for attr, value in body.items():
         # if hit user active field set the field to bool type
