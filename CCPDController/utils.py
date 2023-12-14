@@ -154,6 +154,11 @@ def sanitizeString(field):
         raise TypeError('Invalid Information')
     return field.replace('$', '')
 
+# makesure number is int and no $
+def sanitizeNumber(num):
+    if not isinstance(num, int):
+        raise TypeError('Invalid Information')
+
 # sanitize all field in user info body
 # make sure user is active and remove $
 def sanitizeBody(body):

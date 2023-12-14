@@ -1,5 +1,6 @@
 import jwt
 import uuid
+import pymongo
 from django.conf import settings
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_protect
@@ -15,7 +16,7 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeBody, user_time_format
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeBody, user_time_format, sanitizeNumber
 
 # pymongo
 db = get_db_client()
@@ -253,3 +254,30 @@ def deleteInvitationCode(request):
     except:
         return Response('Delete Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Code Deleted!', status.HTTP_200_OK)
+
+# currPage: number
+# itemsPerPage: number
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getQARecordsByPage(request):
+    try:
+        body = decodeJSON(request.body)
+        sanitizeNumber(body['page'])
+        sanitizeNumber(body['itemsPerPage'])
+    except:
+        return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
+
+    try:
+        arr = []
+        skip = body['page'] * body['itemsPerPage']
+        for inventory in inventory_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage']):
+            # convert ObjectId
+            inventory['_id'] = str(inventory['_id'])
+            arr.append(inventory)
+        # if pulled array empty return no content
+        if len(arr) == 0:
+            return Response('No Result', status.HTTP_204_NO_CONTENT)
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(arr, status.HTTP_200_OK)
