@@ -21,8 +21,11 @@ from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanit
 # pymongo
 db = get_db_client()
 user_collection = db['User']
-inventory_collection = db['Inventory']
+qa_collection = db['Inventory']
 inv_code_collection = db['Invitations']
+instock_collection = db['Instock']
+retail_collection = db['Retail']
+return_collection = db['Return']
 
 # admin jwt token expiring time
 admin_expire_days = 90
@@ -192,14 +195,14 @@ def updateUserById(request, uid):
     return Response('Password Updated', status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def getAllInventory(request): 
-    inv = []
-    for item in inventory_collection.find({}, {'_id': 0}):
-        inv.append(item)
-    return Response(inv, status.HTTP_200_OK)
+# @api_view(['GET'])
+# @authentication_classes([JWTAuthentication])
+# @permission_classes([IsAdminPermission])
+# def getAllInventory(request): 
+#     inv = []
+#     for item in qa_collection.find({}, {'_id': 0}):
+#         inv.append(item)
+#     return Response(inv, status.HTTP_200_OK)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
@@ -271,7 +274,7 @@ def getQARecordsByPage(request):
     try:
         arr = []
         skip = body['page'] * body['itemsPerPage']
-        for inventory in inventory_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage']):
+        for inventory in qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage']):
             # convert ObjectId
             inventory['_id'] = str(inventory['_id'])
             arr.append(inventory)
@@ -281,3 +284,21 @@ def getQARecordsByPage(request):
     except:
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def deleteQARecordsBySku(request, sku): 
+    try:
+        sanitizeNumber(int(sku))
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        res = qa_collection.delete_one({sku: sku})
+        if not res:
+            return Response('Inventory SKU Not Found', status.HTTP_404_NOT_FOUND)
+    except:
+        return Response('Failed Deleting From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Inventory Deleted', status.HTTP_200_OK)

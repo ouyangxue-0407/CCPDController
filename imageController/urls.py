@@ -5,5 +5,4 @@ from . import views
 urlpatterns = [
     path("uploadImage/<str:owner>/<str:sku>", views.uploadImage, name="uploadImage"),
     path("downloadAllImagesBySKU", views.downloadAllImagesBySKU, name="downloadAllImagesBySKU"),
-    path("listBlobContainers", views.listBlobContainers, name="listBlobContainers")
 ]

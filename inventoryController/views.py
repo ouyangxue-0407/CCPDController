@@ -127,6 +127,7 @@ def createInventory(request):
             shelfLocation=body['shelfLocation'],
             amount=body['amount'],
             owner=body['owner'],
+            ownerName=body['ownerName'],
             marketplace=body['marketplace']
         )
         # pymongo need dict or bson object
@@ -175,6 +176,7 @@ def updateInventoryBySku(request, sku):
             shelfLocation = newInv['shelfLocation'],
             amount = newInv['amount'],
             owner = newInv['owner'],
+            ownerName = newInv['ownerName'],
             marketplace = newInv['marketplace']
         )
     except:

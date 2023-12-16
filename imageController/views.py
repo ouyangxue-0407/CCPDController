@@ -1,4 +1,7 @@
 import os
+import io
+import pillow_heif
+from PIL import Image
 from time import time, ctime
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.core.exceptions import ResourceExistsError
@@ -46,19 +49,38 @@ def uploadImage(request, sku, owner):
     
     # loop the files in the request
     for name, value in request.FILES.items():
-        # add tags of owner and time info
+        # azure allow tags on each blob
         inventory_tags = {
             "sku": sku, 
             "time": str(ctime(time())),
             "owner": owner
         }
+        
         # images will be uploaded to the folder named after their sku
+        img = value
         imageName = sku + '/' + sku + '_' + name
+        
+        # process apples photo format
+        if 'heic' in name or 'HEIC' in name:
+            # convert image to jpg
+            heicFile = pillow_heif.read_heif(value)
+            byteImage = Image.frombytes (
+                heicFile.mode,
+                heicFile.size,
+                heicFile.data,
+                "raw"
+            )
+            buf = io.BytesIO()
+            byteImage.save(buf, format="JPEG")
+            img = buf.getvalue()
+            # change extension to jpg
+            base_name = os.path.splitext(name)[0]
+            imageName = sku + '/' + sku + '_' + base_name + '.' + 'jpg'
+        
         try:
-            res = product_image_container.upload_blob(imageName, value.file, tags=inventory_tags)
+            res = product_image_container.upload_blob(imageName, img, tags=inventory_tags)
         except ResourceExistsError:
             return Response(imageName + 'Already Exist!', status.HTTP_409_CONFLICT)
-    
     
     # construct database row object
     # newInventoryImage = InventoryImage(
@@ -72,13 +94,3 @@ def uploadImage(request, sku, owner):
     # await collection.insert_one(newInventoryImage.__dict__)
 
     return Response(res.url, status.HTTP_200_OK)
-
-# list blob containers
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def listBlobContainers(request):
-    
-    
-    return Response('Listing blob containers......', status.HTTP_200_OK)
-    

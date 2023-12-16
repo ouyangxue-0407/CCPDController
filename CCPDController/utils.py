@@ -148,6 +148,8 @@ def sanitizeInvitationCode(code):
         return False
     return code
 
+
+# these below will raise type error instead of returning false
 # make sure string is type str and no $ included 
 def sanitizeString(field):
     if not isinstance(field, str):
