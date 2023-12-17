@@ -296,9 +296,27 @@ def deleteQARecordsBySku(request, sku):
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
     
     try:
-        res = qa_collection.delete_one({sku: sku})
+        res = qa_collection.delete_one({'sku': sku})
         if not res:
             return Response('Inventory SKU Not Found', status.HTTP_404_NOT_FOUND)
     except:
         return Response('Failed Deleting From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Inventory Deleted', status.HTTP_200_OK)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getQARecordBySku(request, sku):
+    sku = int(sku)
+    try:
+        sanitizeNumber(sku)
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        res = qa_collection.find_one({'sku': sku}, {'_id': 0})
+        if not res:
+            return Response('Inventory SKU Not Found', status.HTTP_404_NOT_FOUND)
+    except:
+        return Response('Failed Querying Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(res, status.HTTP_200_OK)

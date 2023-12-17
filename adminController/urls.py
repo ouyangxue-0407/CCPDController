@@ -14,4 +14,5 @@ urlpatterns = [
     path('deleteInvitationCode', views.deleteInvitationCode, name="deleteInvitationCode"),
     path('getQARecordsByPage', views.getQARecordsByPage, name="getQARecordsByPage"),
     path('deleteQARecordsBySku/<str:sku>', views.deleteQARecordsBySku, name="deleteQARecordsBySku"),
+    path('getQARecordBySku/<str:sku>', views.getQARecordBySku, name="getQARecordBySku"),
 ]
