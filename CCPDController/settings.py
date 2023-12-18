@@ -82,7 +82,7 @@ WSGI_APPLICATION = 'CCPDController.wsgi.application'
 # https settings
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = False   # http -> https 
+SECURE_SSL_REDIRECT = True   # http -> https 
 
 # cookies settings
 SESSION_COOKIE_HTTPONLY = True
