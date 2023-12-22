@@ -163,7 +163,7 @@ def sanitizeNumber(num):
 
 # sanitize all field in user info body
 # make sure user is active and remove $
-def sanitizeBody(body):
+def sanitizeUserInfoBody(body):
     for attr, value in body.items():
         # if hit user active field set the field to bool type
         # if not sanitize string and remove '$'

@@ -15,4 +15,7 @@ urlpatterns = [
     path('getQARecordsByPage', views.getQARecordsByPage, name="getQARecordsByPage"),
     path('deleteQARecordsBySku/<str:sku>', views.deleteQARecordsBySku, name="deleteQARecordsBySku"),
     path('getQARecordBySku/<str:sku>', views.getQARecordBySku, name="getQARecordBySku"),
+    path('getSalesRecordsByPage', views.getSalesRecordsByPage, name="getSalesRecordsByPage"),
+    path('createSalesRecord', views.createSalesRecord, name="createSalesRecord"),
+    path('getSalesRecordsBySku/<str:sku>', views.getSalesRecordsBySku, name="getSalesRecordsBySku"),
 ]

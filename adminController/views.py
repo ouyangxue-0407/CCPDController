@@ -8,7 +8,7 @@ from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta, date
 from userController.models import User
-from .models import InvitationCode
+from .models import InvitationCode, RetailRecord
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeBody, user_time_format, sanitizeNumber
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeUserInfoBody, user_time_format, sanitizeNumber
 
 # pymongo
 db = get_db_client()
@@ -30,12 +30,13 @@ return_collection = db['Return']
 # admin jwt token expiring time
 admin_expire_days = 90
 
+# check admin token
 @csrf_protect
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def checkAdminToken(request):
-    # get token
+    # get token from cookie, token is 100% set because of permission
     token = request.COOKIES.get('token')
     
     # decode and return user id
@@ -52,7 +53,7 @@ def checkAdminToken(request):
             return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
     return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
 
-# login any user and issue jwt
+# login admins
 @csrf_protect
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -106,6 +107,7 @@ def adminLogin(request):
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire, samesite="None", secure=True)
     return response
 
+# create user with custom roles 
 @csrf_protect
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -113,7 +115,7 @@ def adminLogin(request):
 def createUser(request):
     try:
         body = decodeJSON(request.body)
-        sanitizeBody(body)
+        sanitizeUserInfoBody(body)
         newUser = User (
             name=body['name'],
             email=body['email'],
@@ -173,7 +175,7 @@ def updateUserById(request, uid):
         body = decodeJSON(request.body)
         
         # loop body obeject and remove $
-        sanitizeBody(body)
+        sanitizeUserInfoBody(body)
     except:
         return Response('Invalid User Info', status.HTTP_400_BAD_REQUEST)
     
@@ -193,16 +195,6 @@ def updateUserById(request, uid):
     except:
         return Response('Update User Infomation Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Password Updated', status.HTTP_200_OK)
-
-
-# @api_view(['GET'])
-# @authentication_classes([JWTAuthentication])
-# @permission_classes([IsAdminPermission])
-# def getAllInventory(request): 
-#     inv = []
-#     for item in qa_collection.find({}, {'_id': 0}):
-#         inv.append(item)
-#     return Response(inv, status.HTTP_200_OK)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
@@ -320,3 +312,80 @@ def getQARecordBySku(request, sku):
     except:
         return Response('Failed Querying Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(res, status.HTTP_200_OK)
+
+# page: number
+# itemsPerPage: number
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getSalesRecordsByPage(request):
+    try:
+        body = decodeJSON(request.body)
+        currPage = sanitizeNumber(int(body['currPage']))
+        itemsPerPage = sanitizeNumber(int(body['itemsPerPage']))
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    arr = []
+    skip = currPage * itemsPerPage
+    for record in retail_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage']):
+        # convert ObjectId
+        record['_id'] = str(record['_id'])
+        arr.append(record)
+
+    # if pulled array empty return no content
+    if len(arr) == 0:
+        return Response('No Result', status.HTTP_204_NO_CONTENT)
+    return Response(arr, status.HTTP_200_OK)
+
+
+# RetailRecord: RetailRecord
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def createSalesRecord(request):
+    try:
+        body = decodeJSON(request.body)
+        newRecord = RetailRecord (
+            sku=body['sku'],
+            time=body['time'],
+            amount=body['amount'],
+            quantity=body['quantity'],
+            marketplace=body['marketplace'],
+            paymentMethod=body['paymentMethod'],
+            buyerName=body['buyerName'],
+            adminName=body['adminName'],
+            # is this redundent
+            invoiceNumber=body['invoiceNumber'] if body['invoiceNumber'] else '',
+            adminId=body['adminId'] if body['adminId'] else '',
+        )
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    res = retail_collection.insert_one(newRecord)
+    if not res:
+        return Response('Cannot Insert Into DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Sales Record Created', status.HTTP_200_OK)
+
+# one SKU could have multiple retail records with different info
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getSalesRecordsBySku(request, sku):
+    try:
+        sku = sanitizeNumber(int(sku))
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    # get all sales records associated with this sku
+    arr = []
+    for inventory in retail_collection.find({'sku': sku}):
+        # convert ObjectId to string prevent error
+        inventory['_id'] = str(inventory['_id'])
+        arr.append(inventory)
+    if len(arr) < 1:
+        return Response('No Records Found', status.HTTP_404_NOT_FOUND)
+    return Response(arr, status.HTTP_200_OK)
+
+    
+    

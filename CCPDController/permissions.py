@@ -29,11 +29,13 @@ class IsAdminPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.auth == 'Admin' and bool(request.user['userActive']) == True :
             return True
+        elif request.auth == 'Super Admin':
+            return True
 
 class IsSuperAdmin(permissions.BasePermission):
     message = 'Permission Denied, Super Admin Only!'
     def has_permission(self, request, view):
-        if request.auth == 'SAdmin':
+        if request.auth == 'Super Admin':
             return True
 
 # user blocked by IP black list
