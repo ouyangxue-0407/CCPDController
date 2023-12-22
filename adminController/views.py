@@ -179,11 +179,6 @@ def updateUserById(request, uid):
     except:
         return Response('Invalid User Info', status.HTTP_400_BAD_REQUEST)
     
-    print('user before modification:')
-    print(user)
-    print('req body:')
-    print(body)
-    
     # update user information
     try:
         user_collection.update_one(
@@ -388,4 +383,53 @@ def getSalesRecordsBySku(request, sku):
     return Response(arr, status.HTTP_200_OK)
 
     
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def createReturnRecord(request):
+    return Response('Return Record')
+
+
+# currPage: string
+# itemsPerPage: string
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getProblematicRecordsByPage(request):
+    try:
+        body = decodeJSON(request.body)
+        print(body['currPage'])
+        print(int(body['currPage']))
+        print(body['itemsPerPage'])
+        print(int(body['itemsPerPage']))
+        sanitizeNumber(int(body['currPage']))
+        sanitizeNumber(int(body['itemsPerPage']))
+    except:
+        return Response('Invalid Page Info', status.HTTP_400_BAD_REQUEST)
     
+    arr = []
+    skip = int(body['currPage']) * int(body['itemsPerPage'])
+    for item in qa_collection.find({ 'problem': True }).skip(skip).limit(int(body['itemsPerPage'])):
+        item['_id'] = str(item['_id'])
+        arr.append(item)
+    
+    return Response(arr, status.HTTP_200_OK)
+
+# set problem to true for qa records
+@api_view(['PATCH'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def setProblematicBySku(request, sku):
+    try:
+        sanitizeNumber(int(sku))
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+
+    # update record
+    res = qa_collection.update_one(
+        { 'sku': int(sku) },
+        { '$set': {'problem': True} },
+    )
+    if not res:
+        return Response('Cannot Modify Records', status.HTTP_500_INTERNAL_SERVER_ERROR)    
+    return Response('Record Set', status.HTTP_200_OK)
