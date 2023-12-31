@@ -19,6 +19,6 @@ urlpatterns = [
     path('createSalesRecord', views.createSalesRecord, name="createSalesRecord"),
     path('getSalesRecordsBySku/<str:sku>', views.getSalesRecordsBySku, name="getSalesRecordsBySku"),
     path('createReturnRecord', views.createReturnRecord, name="createReturnRecord"),
-    path('getProblematicRecordsByPage', views.getProblematicRecordsByPage, name="getProblematicRecordsByPage"),
+    path('getProblematicRecords', views.getProblematicRecords, name="getProblematicRecords"),
     path('setProblematicBySku/<str:sku>', views.setProblematicBySku, name="setProblematicBySku"),
 ]

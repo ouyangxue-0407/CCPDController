@@ -395,27 +395,16 @@ def createReturnRecord(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getProblematicRecordsByPage(request):
-    try:
-        body = decodeJSON(request.body)
-        print(body['currPage'])
-        print(int(body['currPage']))
-        print(body['itemsPerPage'])
-        print(int(body['itemsPerPage']))
-        sanitizeNumber(int(body['currPage']))
-        sanitizeNumber(int(body['itemsPerPage']))
-    except:
-        return Response('Invalid Page Info', status.HTTP_400_BAD_REQUEST)
-    
+def getProblematicRecords(request):
     arr = []
-    skip = int(body['currPage']) * int(body['itemsPerPage'])
-    for item in qa_collection.find({ 'problem': True }).skip(skip).limit(int(body['itemsPerPage'])):
+    for item in qa_collection.find({ 'problem': True }):
         item['_id'] = str(item['_id'])
         arr.append(item)
     
     return Response(arr, status.HTTP_200_OK)
 
 # set problem to true for qa records
+# isProblem: bool
 @api_view(['PATCH'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
