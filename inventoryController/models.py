@@ -16,6 +16,8 @@ class InventoryItem(models.Model):
     PLATFORM_CHOISES = [
         ('Amazon', 'Amazon'),
         ('eBay', 'eBay'),
+        ('HomeDepot', 'HomeDepot'),
+        ('AliExpress', 'AliExpress'),
         ('Official Website', 'Official Website'),
         ('Other', 'Other')
     ]

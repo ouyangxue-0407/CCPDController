@@ -44,10 +44,14 @@ min_inv_code = 10
 max_role = 12
 min_role = 4
 
-# user format
+# user registration date format
 user_time_format = "%b %-d %Y"
-# inventory and invitation code format
-time_format = "%a %b %d %H:%M:%S %Y"
+# time_format = "%a %b %d %H:%M:%S %Y"
+
+# inventory time format
+# time format should match moment.js (MMM DD YYYY HH:mm:ss)
+time_format = "%b %d %Y %H:%M:%S"
+
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
 def convertToTime(time_str):

@@ -115,25 +115,27 @@ def createInventory(request):
     if inv:
         return Response('SKU Already Existed', status.HTTP_409_CONFLICT)
     
-    try:
-        # construct new inventory
-        newInventory = InventoryItem(
-            time=str(ctime(time())),
-            sku=sku,
-            itemCondition=body['itemCondition'],
-            comment=body['comment'],
-            link=body['link'],
-            platform=body['platform'],
-            shelfLocation=body['shelfLocation'],
-            amount=body['amount'],
-            owner=body['owner'],
-            ownerName=body['ownerName'],
-            marketplace=body['marketplace']
-        )
-        # pymongo need dict or bson object
-        res = qa_collection.insert_one(newInventory.__dict__)
-    except:
-        return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
+    # try:
+    print(body['time'])
+    # construct new inventory
+    newInventory = InventoryItem(
+        # time=str(ctime(time())),
+        time=body['time'],
+        sku=sku,
+        itemCondition=body['itemCondition'],
+        comment=body['comment'],
+        link=body['link'],
+        platform=body['platform'],
+        shelfLocation=body['shelfLocation'],
+        amount=body['amount'],
+        owner=body['owner'],
+        ownerName=body['ownerName'],
+        marketplace=body['marketplace']
+    )
+    # pymongo need dict or bson object
+    res = qa_collection.insert_one(newInventory.__dict__)
+    # except:
+    #     return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
     return Response('Inventory Created', status.HTTP_200_OK)
 
 # query param sku and body of new inventory info

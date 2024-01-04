@@ -397,7 +397,7 @@ def createReturnRecord(request):
 @permission_classes([IsAdminPermission])
 def getProblematicRecords(request):
     arr = []
-    for item in qa_collection.find({ 'problem': True }):
+    for item in qa_collection.find({ 'problem': True }).sort('sku', pymongo.DESCENDING):
         item['_id'] = str(item['_id'])
         arr.append(item)
     
@@ -410,14 +410,16 @@ def getProblematicRecords(request):
 @permission_classes([IsAdminPermission])
 def setProblematicBySku(request, sku):
     try:
+        body = decodeJSON(request.body)
         sanitizeNumber(int(sku))
+        isProblem = bool(body['isProblem'])
     except:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
 
     # update record
     res = qa_collection.update_one(
         { 'sku': int(sku) },
-        { '$set': {'problem': True} },
+        { '$set': {'problem': isProblem} },
     )
     if not res:
         return Response('Cannot Modify Records', status.HTTP_500_INTERNAL_SERVER_ERROR)    
