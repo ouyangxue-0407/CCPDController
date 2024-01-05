@@ -16,7 +16,17 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, sanitizeUserInfoBody, user_time_format, sanitizeNumber
+from CCPDController.utils import (
+    decodeJSON,
+    get_db_client, 
+    sanitizeEmail, 
+    sanitizePassword, 
+    sanitizeString, 
+    sanitizeUserInfoBody, 
+    user_time_format, 
+    sanitizeNumber,
+    filter_time_format,
+)
 
 # pymongo
 db = get_db_client()
@@ -251,23 +261,58 @@ def deleteInvitationCode(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def getQARecordsByPage(request):
-    try:
-        body = decodeJSON(request.body)
-        sanitizeNumber(body['page'])
-        sanitizeNumber(body['itemsPerPage'])
-    except:
-        return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
-
+    # try:
+    body = decodeJSON(request.body)
+    sanitizeNumber(body['page'])
+    sanitizeNumber(body['itemsPerPage'])
+    
+    
+    query_filter = body['filter']
+    print(query_filter)
+    
+    timeRange = query_filter['timeRangeFilter']
+    print(timeRange)
+    
+    # strip the filter into mongoDB query object
+    fil = {}
+    if query_filter['conditionFilter'] != '':
+        sanitizeString(query_filter['conditionFilter'])
+        fil['itemCondition'] = query_filter['conditionFilter']
+    if query_filter['platformFilter'] != '':
+        sanitizeString(query_filter['platformFilter'])
+        fil['platform'] = query_filter['platformFilter']
+    if query_filter['marketplaceFilter'] != '':
+        sanitizeString(query_filter['marketplaceFilter'])
+        fil['marketplace'] = query_filter['marketplaceFilter']
+    if timeRange != {}:
+        sanitizeString(timeRange['from'])
+        sanitizeString(timeRange['to'])
+        fil['time'] = {
+            '$gte': datetime.strptime(timeRange['from'], filter_time_format),
+            '$lt': datetime.strptime(timeRange['to'], filter_time_format)
+        }
+    print(fil)
+        
+    # except:
+    #     return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
+    
+     
+    
     try:
         arr = []
         skip = body['page'] * body['itemsPerPage']
-        for inventory in qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage']):
-            # convert ObjectId
-            inventory['_id'] = str(inventory['_id'])
-            arr.append(inventory)
+
+        if fil == {}:
+            query = qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        else:
+            query = qa_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        for inventory in query:
+                inventory['_id'] = str(inventory['_id'])
+                arr.append(inventory)
+                
         # if pulled array empty return no content
         if len(arr) == 0:
-            return Response('No Result', status.HTTP_204_NO_CONTENT)
+            return Response([], status.HTTP_204_NO_CONTENT)
     except:
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)

@@ -52,6 +52,8 @@ user_time_format = "%b %-d %Y"
 # time format should match moment.js (MMM DD YYYY HH:mm:ss)
 time_format = "%b %d %Y %H:%M:%S"
 
+filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
 def convertToTime(time_str):
