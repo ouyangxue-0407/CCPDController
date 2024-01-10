@@ -265,15 +265,14 @@ def getQARecordsByPage(request):
     body = decodeJSON(request.body)
     sanitizeNumber(body['page'])
     sanitizeNumber(body['itemsPerPage'])
-    
-    
+
     query_filter = body['filter']
     print(query_filter)
     
     timeRange = query_filter['timeRangeFilter']
     print(timeRange)
     
-    # strip the filter into mongoDB query object
+    # strip the filter into mongoDB query object in fil
     fil = {}
     if query_filter['conditionFilter'] != '':
         sanitizeString(query_filter['conditionFilter'])
@@ -292,30 +291,31 @@ def getQARecordsByPage(request):
             '$lt': datetime.strptime(timeRange['to'], filter_time_format)
         }
     print(fil)
-        
+    
     # except:
     #     return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
-    
-     
     
     try:
         arr = []
         skip = body['page'] * body['itemsPerPage']
-
+        
         if fil == {}:
             query = qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = qa_collection.count_documents({})
         else:
             query = qa_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = qa_collection.count_documents(fil)
+
         for inventory in query:
                 inventory['_id'] = str(inventory['_id'])
                 arr.append(inventory)
                 
         # if pulled array empty return no content
         if len(arr) == 0:
-            return Response([], status.HTTP_204_NO_CONTENT)
+            return Response([], status.HTTP_200_OK)
     except:
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    return Response(arr, status.HTTP_200_OK)
+    return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
 
 
 @api_view(['POST'])

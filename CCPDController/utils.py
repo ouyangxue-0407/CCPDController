@@ -166,6 +166,7 @@ def sanitizeString(field):
 def sanitizeNumber(num):
     if not isinstance(num, int):
         raise TypeError('Invalid Information')
+    return num
 
 # sanitize all field in user info body
 # make sure user is active and remove $
