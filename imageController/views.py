@@ -15,6 +15,7 @@ from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sani
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from dotenv import load_dotenv
+from urllib import parse
 load_dotenv()
 
 # Azure Blob
@@ -24,9 +25,6 @@ container_name = 'product-image'
 azure_blob_client = BlobServiceClient.from_connection_string(os.getenv('SAS_KEY'))
 # container handle for product image
 product_image_container_client = azure_blob_client.get_container_client(container_name)
-
-# # MongoDB
-# db = get_db_client()
 
 # return array of all image url from owner
 @api_view(['POST'])
@@ -88,15 +86,16 @@ def uploadImage(request, ownerId, owner, sku):
     #     'IMG_20231110_150000.jpg': [<InMemoryUploadedFile: IMG_20231110_150000.jpg (image/jpeg)>]
     # }
     
+    # azure allow tags on each blob
+    inventory_tags = {
+        "sku": sku, 
+        "time": str(ctime(time())),
+        "owner": ownerId,
+        "ownerName": owner
+    }
+    
     # loop the files in the request
     for name, value in request.FILES.items():
-        # azure allow tags on each blob
-        inventory_tags = {
-            "sku": sku, 
-            "time": str(ctime(time())),
-            "owner": ownerId,
-            "ownerName": owner
-        }
         
         # images will be uploaded to the folder named after their sku
         img = value
@@ -133,10 +132,10 @@ def deleteImageByName(request):
     sku = body['sku']
     name = body['name']
     
-    imageName = sku + '/' + sku + '_' + name
-    print(imageName)
-    # res = product_image_container_client.delete_blob(imageName)
-    # print(res)
-    
-    
+    # azure automatically unquote all % in url
+    imageName = parse.unquote(sku + '/' + name)
+    try:
+        res = product_image_container_client.delete_blob(imageName)
+    except:
+        return Response('No Such Image', status.HTTP_404_NOT_FOUND)
     return Response('Image Deleted', status.HTTP_200_OK)
