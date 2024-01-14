@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import json
 from django.conf import settings
+import pytz
 from rest_framework.response import Response
 from rest_framework import exceptions
 from pymongo import MongoClient
@@ -46,14 +47,27 @@ min_role = 4
 
 # user registration date format
 user_time_format = "%b %-d %Y"
-# time_format = "%a %b %d %H:%M:%S %Y"
+
+# Q&A table time filter format
+filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+# image blob date format
+blob_date_format = "%a %b %d %Y"
+
+# return blob time string with format of blob date format
+def getBlobTimeString() -> str:
+    eastern_timezone = pytz.timezone('America/Toronto')
+    current_time = datetime.now(eastern_timezone)
+    return current_time.strftime(blob_date_format)
+
+def getNDayBefore(days_before, time_str) -> str:
+    blob_time = datetime.strptime(time_str, blob_date_format)
+    blob_time = blob_time - timedelta(days=days_before)
+    return blob_time.strftime(blob_date_format)
 
 # inventory time format
 # time format should match moment.js (MMM DD YYYY HH:mm:ss)
 time_format = "%b %d %Y %H:%M:%S"
-
-filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
-
 # convert from string to datetime
 # example: Thu Oct 12 18:48:49 2023
 def convertToTime(time_str):

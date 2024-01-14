@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeString
+from CCPDController.utils import decodeJSON, getNDayBefore, sanitizeNumber, sanitizeString, getBlobTimeString
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from dotenv import load_dotenv
@@ -36,8 +36,13 @@ def getUrlsByOwner(request):
         sanitizeString(body['owner'])
     except:
         return Response('Invalid Owner Id', status.HTTP_400_BAD_REQUEST)
-        
-    query = "\"owner\"='" + body['owner'] + "'"
+    
+    # format: Wed Jan 10 2024
+    # filter image created within 2 days
+    time = "\"time\"<='" + getNDayBefore(2, getBlobTimeString()) + "'"
+    owner = "\"owner\"='" + body['owner'] + "'"
+    query = owner + " AND " + time
+    print(query)
     blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=query)
     
     arr = []
@@ -60,9 +65,8 @@ def getUrlsBySku(request):
         sanitizeNumber(int(body['sku']))
     except:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
-    
-    query = "\"sku\"='" + body['sku'] + "'"
-    blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=query)
+    sku = "sku = '" + body['sku'] + "'"
+    blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=sku)
     
     arr = []
     for blob in blob_list:
@@ -89,14 +93,13 @@ def uploadImage(request, ownerId, owner, sku):
     # azure allow tags on each blob
     inventory_tags = {
         "sku": sku, 
-        "time": str(ctime(time())),
+        "time": getBlobTimeString(), # format: Wed Jan 10 2024
         "owner": ownerId,
         "ownerName": owner
     }
     
     # loop the files in the request
     for name, value in request.FILES.items():
-        
         # images will be uploaded to the folder named after their sku
         img = value
         imageName = sku + '/' + sku + '_' + name
@@ -116,7 +119,7 @@ def uploadImage(request, ownerId, owner, sku):
             img = buf.getvalue()
             # change extension to jpg
             base_name = os.path.splitext(name)[0]
-            imageName = sku + '/' + sku + '_' + base_name + '.' + 'jpg'
+            imageName = sku + '/' + base_name + '.' + 'jpg'
         
         try:
             res = product_image_container_client.upload_blob(imageName, img, tags=inventory_tags)
