@@ -13,7 +13,7 @@ load_dotenv()
 # ssl hand shake error because ip not whitelisted
 client = MongoClient(
     os.getenv('DATABASE_URL'), 
-    maxPoolSize=1
+    maxPoolSize=2
 )
 db_handle = client[os.getenv('DB_NAME')]
 def get_db_client():

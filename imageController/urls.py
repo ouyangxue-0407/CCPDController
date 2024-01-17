@@ -7,4 +7,5 @@ urlpatterns = [
     path("getUrlsByOwner", views.getUrlsByOwner, name="getUrlsByOwner"),
     path("getUrlsBySku", views.getUrlsBySku, name="getUrlsBySku"),
     path("deleteImageByName", views.deleteImageByName, name="deleteImageByName"),
+    path("scrapeStockImageBySku", views.scrapeStockImageBySku, name="scrapeStockImageBySku"),
 ]

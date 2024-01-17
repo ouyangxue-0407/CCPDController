@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from bson.objectid import ObjectId
 from collections import Counter
+from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
 import pymongo
 
 # pymongo
@@ -244,3 +245,32 @@ def deleteInventoryBySku(request):
         de = qa_collection.delete_one({'sku': sku})
         return Response('Inventory Deleted', status.HTTP_200_OK)
     return Response('Cannot Delete Inventory After 24H, Please Contact Admin', status.HTTP_403_FORBIDDEN)
+
+# get all shelf location for existing inventories
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllShelfLocations():
+    arr = qa_collection.distinct('shelfLocation')
+    return Response(arr, status.HTTP_200_OK)
+
+# description: string
+@api_view(['GET'])
+def generateDescriptionBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    print(sku)
+    # grab comment from that specific item
+    comment = qa_collection.find_one({'sku': sku}, {'comment': 1})
+    if not comment:
+        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
+    
+    # call chat gpt to generate description
+    lead = generate_short_product_title('USED LIKE NEW - MISISNG 2 ACCESSORIES - Double Canister Dry Food Dispenser Convenient Storage')
+    # full_lead = generate_full_product_title(comment['comment'], '')
+    
+    return Response(lead, status.HTTP_200_OK)

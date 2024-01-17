@@ -289,12 +289,7 @@ def getQARecordsByPage(request):
         gt = datetime.fromisoformat(timeRange['from'][:-1])
         lt = datetime.fromisoformat(timeRange['to'][:-1])
         fil['time'] = {
-            # '$gte': datetime.strptime(timeRange['from'], time_format),
-            # '$lt': datetime.strptime(timeRange['to'], time_format)
-            # '$gte': gt.strftime("%a %b %-d %H:%M:%S %Y"),
-            # '$lt': lt.strftime("%a %b %-d %H:%M:%S %Y")
-            
-            # mongoDB time range query only support format like '2024-01-03T05:00:00.000Z'
+            # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
             '$gte': timeRange['from'],
             '$lt': timeRange['to']
         }

@@ -5,18 +5,22 @@ from PIL import Image
 import datetime
 from datetime import timedelta
 from time import time, ctime
-from azure.storage.blob import BlobServiceClient, BlobClient
+from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
-from CCPDController.utils import decodeJSON, getNDayBefore, sanitizeNumber, sanitizeString, getBlobTimeString
+from CCPDController.utils import decodeJSON, getNDayBefore, sanitizeNumber, sanitizeString, getBlobTimeString, get_db_client
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from dotenv import load_dotenv
 from urllib import parse
+import pymongo
 load_dotenv()
+
+# Mongo DB
+db = get_db_client()
+qa_collection = db['Inventory']
 
 # Azure Blob
 account_name = 'CCPD'
@@ -142,3 +146,24 @@ def deleteImageByName(request):
     except:
         return Response('No Such Image', status.HTTP_404_NOT_FOUND)
     return Response('Image Deleted', status.HTTP_200_OK)
+
+
+# pull one stock image from website and save it to blob container under that sku
+# sku: str
+@api_view(['POST'])
+def scrapeStockImageBySku(request):
+    body = decodeJSON(request.body)
+    sku = sanitizeNumber(int(body['sku']))
+    print(sku)
+    
+    # find target inventory
+    target = qa_collection.find_one({ 'sku': sku })
+    if not target:
+        return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
+    
+    # pull link from inventory db
+    print(target['link'])
+    # look up that link and save it to blob container on Azure
+    
+    
+    return Response(target['link'], status.HTTP_200_OK)
