@@ -10,5 +10,7 @@ urlpatterns = [
     path("getInventoryByOwnerId/<int:page>", views.getInventoryByOwnerId, name="getInventoryByOwnerId"),
     path("getInventoryInfoByOwnerId", views.getInventoryInfoByOwnerId, name="getInventoryInfoByOwnerId"),
     path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
-    path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku")
+    path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
+    path("scrapePriceBySkuAmazon", views.scrapePriceBySkuAmazon, name="scrapePriceBySkuAmazon"),
+    path("scrapePriceBySkuHomeDepot", views.scrapePriceBySkuHomeDepot, name="scrapePriceBySkuHomeDepot"),
 ]

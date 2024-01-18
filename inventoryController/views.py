@@ -1,14 +1,17 @@
+import random
+import requests
 from time import time, ctime
+from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
-from django.views.decorators.csrf import csrf_exempt
 from inventoryController.models import InventoryItem
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeSku, convertToTime, get_client_ip
+from CCPDController.scrape_utils import generate_ua
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from fake_useragent import UserAgent
 from bson.objectid import ObjectId
 from collections import Counter
 from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
@@ -18,6 +21,7 @@ import pymongo
 db = get_db_client()
 qa_collection = db['Inventory']
 user_collection = db['User']
+ua = UserAgent()
 
 # query param sku for inventory db row
 # sku: string
@@ -256,6 +260,8 @@ def getAllShelfLocations():
 
 # description: string
 @api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
 def generateDescriptionBySku(request):
     try:
         body = decodeJSON(request.body)
@@ -274,3 +280,94 @@ def generateDescriptionBySku(request):
     # full_lead = generate_full_product_title(comment['comment'], '')
     
     return Response(lead, status.HTTP_200_OK)
+
+# return mrsp from amazon for given sku
+# sku: string
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def scrapePriceBySkuAmazon(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeNumber(int(body['sku']))
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    # find target inventory
+    target = qa_collection.find_one({ 'sku': sku })
+    if not target:
+        return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
+
+    # extract url incase where the link includes Amazon title
+    url = target['link']
+    start_index = target['link'].find("https://")
+    if start_index != -1:
+        url = target['link'][start_index:]
+        print("Extracted URL:", url)
+
+    # generate header with random user agent
+    headers = {
+        'User-Agent': f'user-agent={ua.random}',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    
+    # get raw html and parse it with scrapy
+    # TODO: purchase and implement proxy service
+    rawHTML = requests.get(url=url, headers=headers).text
+    response = HtmlResponse(url=url, body=rawHTML, encoding='utf-8')
+
+    # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
+    integer = response.selector.xpath('//span[has-class("a-price-whole")]/text()').extract()[0]
+    decimal = response.selector.xpath('//span[has-class("a-price-fraction")]/text()').extract()[0]
+    price = float(integer + '.' + decimal)
+    
+    if not price:
+        return Response('No Result', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(price, status.HTTP_200_OK)
+
+# return mrsp from home depot for given sku
+# sku: string
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def scrapePriceBySkuHomeDepot(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeNumber(int(body['sku']))
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    # find target inventory
+    target = qa_collection.find_one({ 'sku': sku })
+    if not target:
+        return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
+
+    # extract url incase where the link includes title
+    url = target['link']
+    start_index = target['link'].find("https://")
+    if start_index != -1:
+        url = target['link'][start_index:]
+        print("Extracted URL:", url)
+
+    # generate header with random user agent
+    headers = {
+        'User-Agent': f'user-agent={ua.random}',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+    
+    # get raw html and parse it with scrapy
+    # TODO: purchase and implement proxy service
+    rawHTML = requests.get(url=url, headers=headers).text
+    response = HtmlResponse(url=url, body=rawHTML, encoding='utf-8')
+    
+    
+    # HD Canada className = hdca-product__description-pricing-price-value
+    # HD US className = ????
+
+    # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
+    price = response.selector.xpath('//span[has-class("hdca-product__description-pricing-price-value")]/text()').extract()
+    # price = price[0].replace('$', '')
+    
+    if not price:
+        return Response('No Result', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(price, status.HTTP_200_OK)
