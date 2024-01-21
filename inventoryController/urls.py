@@ -11,6 +11,6 @@ urlpatterns = [
     path("getInventoryInfoByOwnerId", views.getInventoryInfoByOwnerId, name="getInventoryInfoByOwnerId"),
     path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
     path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
-    path("scrapePriceBySkuAmazon", views.scrapePriceBySkuAmazon, name="scrapePriceBySkuAmazon"),
+    path("scrapeInfoBySkuAmazon", views.scrapeInfoBySkuAmazon, name="scrapeInfoBySkuAmazon"),
     path("scrapePriceBySkuHomeDepot", views.scrapePriceBySkuHomeDepot, name="scrapePriceBySkuHomeDepot"),
 ]

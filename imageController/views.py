@@ -15,7 +15,6 @@ from rest_framework.response import Response
 from CCPDController.utils import decodeJSON, getNDayBefore, sanitizeNumber, sanitizeString, getBlobTimeString, get_db_client
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
-from CCPDController.scrape_utils import generate_ua
 from dotenv import load_dotenv
 from urllib import parse
 import pymongo
@@ -172,15 +171,3 @@ def scrapeStockImageBySku(request):
     #     'Accept-Language': 'en-US,en;q=0.9',
     # }
     
-    # # get raw html and parse it with scrapy
-    # rawHTML = requests.get(url=target['link'], headers=headers).text
-    # response = HtmlResponse(url=target['link'], body=rawHTML, encoding='utf-8')
-
-    # # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
-    # integer = response.selector.xpath('//span[has-class("a-price-whole")]/text()').extract()[0]
-    # decimal = response.selector.xpath('//span[has-class("a-price-fraction")]/text()').extract()[0]
-    # res = float(integer + '.' + decimal)
-    
-    # if not res:
-    #     return Response('No Result', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    # return Response(res, status.HTTP_200_OK)

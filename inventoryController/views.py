@@ -1,10 +1,11 @@
 import random
+import re
 import requests
 from time import time, ctime
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
-from CCPDController.scrape_utils import generate_ua
+from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
@@ -286,7 +287,7 @@ def generateDescriptionBySku(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def scrapePriceBySkuAmazon(request):
+def scrapeInfoBySkuAmazon(request):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeNumber(int(body['sku']))
@@ -298,32 +299,42 @@ def scrapePriceBySkuAmazon(request):
     if not target:
         return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
 
-    # extract url incase where the link includes Amazon title
-    url = target['link']
-    start_index = target['link'].find("https://")
-    if start_index != -1:
-        url = target['link'][start_index:]
-        print("Extracted URL:", url)
+    # return error if not amazon link or not http
+    link = target['link']
+    if 'amazon' not in link or 'http' not in link:
+        return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
+    
+    # extract the first http url
+    link = extract_urls(link)
 
     # generate header with random user agent
     headers = {
         'User-Agent': f'user-agent={ua.random}',
         'Accept-Language': 'en-US,en;q=0.9',
     }
-    
-    # get raw html and parse it with scrapy
-    # TODO: purchase and implement proxy service
-    rawHTML = requests.get(url=url, headers=headers).text
-    response = HtmlResponse(url=url, body=rawHTML, encoding='utf-8')
+    print(headers)
 
-    # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
-    integer = response.selector.xpath('//span[has-class("a-price-whole")]/text()').extract()[0]
-    decimal = response.selector.xpath('//span[has-class("a-price-fraction")]/text()').extract()[0]
-    price = float(integer + '.' + decimal)
+    # get raw html and parse it with scrapy
+    # TODO: use 10 proxy service to incraese scraping speed
+    payload = {
+        'title': '',
+        'mrsp': '',
+        'imgUrl': ''
+    }
     
-    if not price:
-        return Response('No Result', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    return Response(price, status.HTTP_200_OK)
+    # request the raw html from Amazon
+    rawHTML = requests.get(url=link, headers=headers).text
+    response = HtmlResponse(url=link, body=rawHTML, encoding='utf-8')
+
+    try:
+        # call functions from scrape_utils
+        # it throws exception if no center or right column
+        payload['title'] = getTitle(response)
+        payload['mrsp'] = getMrsp(rawHTML, response)
+        payload['imgUrl'] = getImageUrl(response)
+    except:
+        return Response('Scrape Failed, Cannot Find Component', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(payload, status.HTTP_200_OK)
 
 # return mrsp from home depot for given sku
 # sku: string
@@ -342,8 +353,12 @@ def scrapePriceBySkuHomeDepot(request):
     if not target:
         return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
 
-    # extract url incase where the link includes title
+    # check if url is home depot
     url = target['link']
+    if 'homedepot' not in url or 'http' not in url:
+        return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
+    
+    # extract url incase where the link includes title
     start_index = target['link'].find("https://")
     if start_index != -1:
         url = target['link'][start_index:]
@@ -360,12 +375,15 @@ def scrapePriceBySkuHomeDepot(request):
     rawHTML = requests.get(url=url, headers=headers).text
     response = HtmlResponse(url=url, body=rawHTML, encoding='utf-8')
     
-    
     # HD Canada className = hdca-product__description-pricing-price-value
+    # HD Canada itemprop="price"
+    # <span itemprop="price">44.98</span>
     # HD US className = ????
+    
+    
 
     # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
-    price = response.selector.xpath('//span[has-class("hdca-product__description-pricing-price-value")]/text()').extract()
+    price = response.selector.xpath('//span/text()').extract()
     # price = price[0].replace('$', '')
     
     if not price:
