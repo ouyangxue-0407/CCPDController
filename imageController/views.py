@@ -6,7 +6,6 @@ import pillow_heif
 from PIL import Image
 import datetime
 from datetime import timedelta
-from time import time, ctime
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
 from rest_framework import status
@@ -148,26 +147,3 @@ def deleteImageByName(request):
     except:
         return Response('No Such Image', status.HTTP_404_NOT_FOUND)
     return Response('Image Deleted', status.HTTP_200_OK)
-
-# pull one stock image from website and save it to blob container under that sku
-# sku: str
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def scrapeStockImageBySku(request):
-    body = decodeJSON(request.body)
-    sku = sanitizeNumber(int(body['sku']))
-    print(sku)
-    
-    # # find target inventory
-    # target = qa_collection.find_one({ 'sku': sku })
-    # if not target:
-    #     return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
-
-    # # generate user agent
-    # uaArr = generate_ua()
-    # headers = {
-    #     'User-Agent': f'user-agent={random.choice(uaArr)}',  # Add your user-agent string here
-    #     'Accept-Language': 'en-US,en;q=0.9',
-    # }
-    

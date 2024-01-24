@@ -1,10 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import json
-from django.conf import settings
 import pytz
-from rest_framework.response import Response
-from rest_framework import exceptions
 from pymongo import MongoClient
 from dotenv import load_dotenv
 load_dotenv()
@@ -49,7 +46,11 @@ min_role = 4
 user_time_format = "%b %-d %Y"
 
 # Q&A table time filter format
-filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+# TODO: change from zulu to est (-5:00)
+# filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+filter_time_format = "%Y-%m-%dT%H:%M:%S.%f-05:00"
+
 
 # image blob date format
 blob_date_format = "%a %b %d %Y"
@@ -60,6 +61,7 @@ def getBlobTimeString() -> str:
     current_time = datetime.now(eastern_timezone)
     return current_time.strftime(blob_date_format)
 
+# return N days before time_str in blob date format
 def getNDayBefore(days_before, time_str) -> str:
     blob_time = datetime.strptime(time_str, blob_date_format)
     blob_time = blob_time - timedelta(days=days_before)
@@ -72,6 +74,14 @@ time_format = "%b %d %Y %H:%M:%S"
 # example: Thu Oct 12 18:48:49 2023
 def convertToTime(time_str):
     return datetime.strptime(time_str, time_format)
+
+# inventory time format in eastern timezone
+def getIsoFormatNow():
+    eastern_timezone = pytz.timezone('America/Toronto')
+    current_time = datetime.now(eastern_timezone)
+    now = current_time.isoformat()
+    return now
+
 
 # check if body contains valid user registration information
 def checkBody(body):

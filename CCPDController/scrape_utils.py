@@ -5,13 +5,15 @@ import requests
 from fake_useragent import UserAgent
 
 # Amazon scrapping utils 
+# works for both Amazon CA nad US
+
 # center col div id and class name
 centerColId = 'centerCol'
 centerColClass = 'centerColAlign'
 
 # right col tag id and class name
 rightColId = 'rightCol'
-rightColClass = rightColId
+rightColClass = 'rightCol'
 
 # product title span id
 productTitleId = 'productTitle'
@@ -51,7 +53,6 @@ def getRightCol(response):
     return children
 
 # takes scrapy HtmlResponse object and returns title
-# Amazon CA
 def getTitle(response) -> str:
     arr = getCenterCol(response)
     
@@ -61,32 +62,38 @@ def getTitle(response) -> str:
         title = p.extract().strip()
     return title
 
-# takes rawHTML str and returns
-# mrsp in float 
-# mrsp range in array of float
-# or price unavailable string
-# Amazon CA
+# takes rawHTML str and returns:
+# - mrsp in float 
+# - mrsp range in array of float
+# - or price unavailable string
 def getMrsp(response):
-    arr = getCenterCol(response)
-
+    center = getCenterCol(response)
     right = getRightCol(response)
+    
+    
+    # check for out of stock id in right col
+    outOfStock = right.xpath('//div[@id="outOfStock"]').getall()
+    if len(outOfStock) > 1:
+        return 'Currently unavailable'
+    
     # if 'unqualifiedBuyBox' appears in arr for more than 2 times, return unavailable
     unqualifiedBox = right.xpath('//div[@id="unqualifiedBuyBox"]').getall()[:4]
     if len(unqualifiedBox) > 2:
         return 'Currently unavailable'
-
+    
+    # Currently unavailable in right col set
 
     # grab price in span tag 
     # mrsp whole joint by fraction
-    integer = arr.xpath(f'//span[has-class("{priceWholeClass}")]/text()').extract()
-    decimal = arr.xpath(f'//span[has-class("{priceFractionClass}")]/text()').extract()
+    integer = center.xpath(f'//span[has-class("{priceWholeClass}")]/text()').extract()
+    decimal = center.xpath(f'//span[has-class("{priceFractionClass}")]/text()').extract()
     if integer and decimal:
         price = float(integer[0] + '.' + decimal[0])
         return price
     
     # extract price range if no fixed price
     price = []
-    rangeTag = arr.xpath(f'//span[@class="{priceRangeClass}"]/child::*')
+    rangeTag = center.xpath(f'//span[@class="{priceRangeClass}"]/child::*')
     for p in rangeTag.xpath('//span[@data-a-color="price" or @class="a-offscreen"]/text()').extract():
         if '$' in p and p not in price:
             price.append(p)
@@ -103,5 +110,3 @@ def getImageUrl(response):
         res = http_pattern.findall(img)
         # return res[:2] # for both lq and hq image
         return res[1]
-    
-

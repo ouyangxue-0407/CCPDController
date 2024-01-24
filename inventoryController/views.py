@@ -1,12 +1,11 @@
-import random
+import os
 import re
 import requests
-from time import time, ctime
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
 from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -17,6 +16,8 @@ from bson.objectid import ObjectId
 from collections import Counter
 from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
 import pymongo
+import pandas as pd
+from bs4 import BeautifulSoup
 
 # pymongo
 db = get_db_client()
@@ -301,18 +302,17 @@ def scrapeInfoBySkuAmazon(request):
 
     # return error if not amazon link or not http
     link = target['link']
-    if 'amazon' not in link or 'http' not in link:
+    link = "https://www.amazon.ca/Brightwell-Aquatics-AminOmega-Supplement-Aquaria/dp/B001DCV0ZI/ref=dp_fod_sccl_1/138-3560016-0966344?pd_rd_w=qG68t&content-id=amzn1.sym.e943220f-f90d-493f-b9ae-af4c3e457137&pf_rd_p=e943220f-f90d-493f-b9ae-af4c3e457137&pf_rd_r=HAX5TTWXAFJYSH2XSWVJ&pd_rd_wg=kvVBw&pd_rd_r=a446f094-3404-4173-abbc-8200b7f4c00e&pd_rd_i=B001DCV1PC&th=1"
+    if 'amazon' not in link and 'http' not in link and 'a.co' not in link:
         return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
     
     # extract the first http url
     link = extract_urls(link)
-
     # generate header with random user agent
     headers = {
         'User-Agent': f'user-agent={ua.random}',
         'Accept-Language': 'en-US,en;q=0.9',
     }
-    print(headers)
 
     # get raw html and parse it with scrapy
     # TODO: use 10 proxy service to incraese scraping speed
@@ -325,15 +325,18 @@ def scrapeInfoBySkuAmazon(request):
     # request the raw html from Amazon
     rawHTML = requests.get(url=link, headers=headers).text
     response = HtmlResponse(url=link, body=rawHTML, encoding='utf-8')
-
     try:
-        # call functions from scrape_utils
-        # it throws exception if no center or right column
         payload['title'] = getTitle(response)
-        payload['mrsp'] = getMrsp(rawHTML, response)
+    except:
+        return Response('Failed to Get Title', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    try:
+        payload['mrsp'] = getMrsp(response)
+    except:
+        return Response('Failed to Get MRSP', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    try:
         payload['imgUrl'] = getImageUrl(response)
     except:
-        return Response('Scrape Failed, Cannot Find Component', status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response('No Image URL Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(payload, status.HTTP_200_OK)
 
 # return mrsp from home depot for given sku
@@ -389,3 +392,46 @@ def scrapePriceBySkuHomeDepot(request):
     if not price:
         return Response('No Result', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(price, status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def sendCSV(request):
+    body = decodeJSON(request.body)
+    # relative path
+    path = body['path']
+
+    # joint file location with relative path
+    dirName = os.path.dirname(__file__)
+    fileName = os.path.join(dirName, path)
+    
+    print(getIsoFormatNow())
+    
+    # parse csv to pandas data frame
+    data = pd.read_csv(filepath_or_buffer=fileName)
+    
+    # loop pandas dataframe
+    for index in data.head().index:
+        # time convert to iso format
+        # original: 12/22/2023 5:54pm
+        # targeted: 2024-01-03T05:00:00.000   optional: -05:00 (EST is -5)
+        data['time'][index] = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
+        # print(time)
+        
+        # remove all html tags
+        cleanLink = BeautifulSoup(data['link'][index], "lxml").text
+        
+        # item condition set to capitalized
+        itemCondition = data['itemCondition'][index]
+        
+        # platform
+        platform = data['platform'][index]
+        
+
+        
+    # set output copy path
+    # output = os.path.join(dirName, 'output.csv')
+    # data.to_csv(output)
+        
+    return Response(str(data.tail()), status.HTTP_200_OK)
