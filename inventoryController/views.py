@@ -5,7 +5,7 @@ from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
 from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 
 # pymongo
 db = get_db_client()
-qa_collection = db['Inventory']
+qa_collection = db[qa_inventory_db_name]
 user_collection = db['User']
 ua = UserAgent()
 
@@ -302,12 +302,14 @@ def scrapeInfoBySkuAmazon(request):
 
     # return error if not amazon link or not http
     link = target['link']
-    link = "https://www.amazon.ca/Brightwell-Aquatics-AminOmega-Supplement-Aquaria/dp/B001DCV0ZI/ref=dp_fod_sccl_1/138-3560016-0966344?pd_rd_w=qG68t&content-id=amzn1.sym.e943220f-f90d-493f-b9ae-af4c3e457137&pf_rd_p=e943220f-f90d-493f-b9ae-af4c3e457137&pf_rd_r=HAX5TTWXAFJYSH2XSWVJ&pd_rd_wg=kvVBw&pd_rd_r=a446f094-3404-4173-abbc-8200b7f4c00e&pd_rd_i=B001DCV1PC&th=1"
-    if 'amazon' not in link and 'http' not in link and 'a.co' not in link:
+    if 'https' not in link and '.ca' not in link and '.com' not in link:
         return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
+    if 'a.co' not in link and 'amazon' not in link:
+        return Response('Invalid URL, Not Amazon URL', status.HTTP_400_BAD_REQUEST)
     
     # extract the first http url
     link = extract_urls(link)
+    
     # generate header with random user agent
     headers = {
         'User-Agent': f'user-agent={ua.random}',
@@ -399,39 +401,42 @@ def scrapePriceBySkuHomeDepot(request):
 @permission_classes([IsAdminPermission])
 def sendCSV(request):
     body = decodeJSON(request.body)
-    # relative path
     path = body['path']
 
     # joint file location with relative path
     dirName = os.path.dirname(__file__)
     fileName = os.path.join(dirName, path)
-    
     print(getIsoFormatNow())
     
     # parse csv to pandas data frame
     data = pd.read_csv(filepath_or_buffer=fileName)
     
     # loop pandas dataframe
-    for index in data.head().index:
+    for index in data.index:
         # time convert to iso format
         # original: 12/22/2023 5:54pm
         # targeted: 2024-01-03T05:00:00.000   optional: -05:00 (EST is -5)
-        data['time'][index] = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
-        # print(time)
+        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
+        data.loc[index, 'time'] = time
         
         # remove all html tags
-        cleanLink = BeautifulSoup(data['link'][index], "lxml").text
+        # if link containes '<'
+        if '<' in data['link'][index]:
+            cleanLink = BeautifulSoup(data['link'][index], "lxml").text
+            data.loc[index, 'link'] = cleanLink
         
         # item condition set to capitalized
-        itemCondition = data['itemCondition'][index]
+        itemCondition = str(data['itemCondition'][index]).title()
+        data.loc[index, 'itemCondition'] = itemCondition
         
-        # platform
-        platform = data['platform'][index]
+        # platform other capitalize
+        if data['platform'][index] == 'other':
+            data.loc[index, 'platform'] = 'Other'
         
-
+        # capitalize one of our employee's name
+        if data['ownerName'][index] == 'yuxiang si':
+            data.loc[index, 'ownerName'] = 'Yuxiang Si'
         
     # set output copy path
-    # output = os.path.join(dirName, 'output.csv')
-    # data.to_csv(output)
-        
-    return Response(str(data.tail()), status.HTTP_200_OK)
+    data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
+    return Response(str(data), status.HTTP_200_OK)

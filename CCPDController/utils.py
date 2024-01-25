@@ -16,6 +16,8 @@ db_handle = client[os.getenv('DB_NAME')]
 def get_db_client():
     return db_handle
 
+qa_inventory_db_name = 'QAInventory'
+
 # decode body from json to object
 decodeJSON = lambda body : json.loads(body.decode('utf-8'))
 

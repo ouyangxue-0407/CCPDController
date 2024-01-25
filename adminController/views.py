@@ -25,13 +25,13 @@ from CCPDController.utils import (
     sanitizeUserInfoBody, 
     user_time_format, 
     sanitizeNumber,
-    filter_time_format,
+    qa_inventory_db_name,
 )
 
 # pymongo
 db = get_db_client()
 user_collection = db['User']
-qa_collection = db['Inventory']
+qa_collection = db[qa_inventory_db_name]
 inv_code_collection = db['Invitations']
 instock_collection = db['Instock']
 retail_collection = db['Retail']
