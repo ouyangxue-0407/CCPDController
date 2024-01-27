@@ -193,9 +193,7 @@ def updateUserById(request, uid):
     try:
         user_collection.update_one(
             { '_id': userId }, 
-            {
-                '$set': body
-            }
+            { '$set': body }
         )
     except:
         return Response('Update User Infomation Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -430,7 +428,8 @@ def getSalesRecordsBySku(request, sku):
         return Response('No Records Found', status.HTTP_404_NOT_FOUND)
     return Response(arr, status.HTTP_200_OK)
 
-    
+# retailRecordId: string
+# returnRecord: ReturnRecord
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])

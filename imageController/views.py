@@ -38,16 +38,21 @@ product_image_container_client = azure_blob_client.get_container_client(containe
 def getUrlsByOwner(request):
     try:
         body = decodeJSON(request.body)
-        sanitizeString(body['owner'])
+        sanitizeString(body['ownerName'])
     except:
         return Response('Invalid Owner Id', status.HTTP_400_BAD_REQUEST)
     
     # format: Wed Jan 10 2024
     # filter image created within 2 days
-    time = "\"time\"<='" + getNDayBefore(2, getBlobTimeString()) + "'"
-    owner = "\"owner\"='" + body['owner'] + "'"
+    time = "\"time\">='" + getNDayBefore(2, getBlobTimeString()) + "'"
+    # search by owner ID
+    # owner = "\"owner\"='" + body['owner'] + "'"
+    # search by owner name
+    owner = "\"ownerName\"='" + body['ownerName'] + "'"
     query = owner + " AND " + time
     print(query)
+
+    # collection of blobs
     blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=query)
     
     arr = []

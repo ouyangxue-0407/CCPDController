@@ -36,22 +36,13 @@ def getInventoryBySku(request):
         sku = sanitizeSku(body['sku'])
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
-    
-    if not sku:
-        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
 
     # find the Q&A record
     res = qa_collection.find_one({'sku': sku}, {'_id': 0})
     if not res:
         return Response('Record Not Found', status.HTTP_400_BAD_REQUEST)
     
-    # get user info
-    user = user_collection.find_one({'_id': ObjectId(res['owner'])}, {'name': 1, 'userActive': 1, '_id': 0})
-    if not user:
-        return Response('Owner Not Found', status.HTTP_404_NOT_FOUND)
-    
     # replace owner field in response
-    res['owner'] = user
     return Response(res, status.HTTP_200_OK)
         
 # get all inventory by QA personal

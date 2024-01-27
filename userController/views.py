@@ -25,7 +25,8 @@ inv_collection = db['Invitations']
 expire_days = 30
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
 def getTime(request):
     print(get_client_ip(request))
     return Response(str(datetime.now()))
