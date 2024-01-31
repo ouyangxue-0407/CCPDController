@@ -1,11 +1,11 @@
 import os
-import re
 import requests
+from time import time, ctime
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
 from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -44,8 +44,8 @@ def getInventoryBySku(request):
     
     # replace owner field in response
     return Response(res, status.HTTP_200_OK)
-        
-# get all inventory by QA personal
+
+# get all inventory of owner by page
 # id: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -68,7 +68,6 @@ def getInventoryByOwnerId(request, page):
     for inventory in qa_collection.find({ 'owner': ownerId }).sort('sku', pymongo.DESCENDING).skip(skip).limit(limit):
         inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
-    
     return Response(arr, status.HTTP_200_OK)
 
 
@@ -117,18 +116,17 @@ def createInventory(request):
     print(body['time'])
     # construct new inventory
     newInventory = InventoryItem(
-        # time=str(ctime(time())),
-        time=body['time'],
-        sku=sku,
-        itemCondition=body['itemCondition'],
-        comment=body['comment'],
-        link=body['link'],
-        platform=body['platform'],
-        shelfLocation=body['shelfLocation'],
-        amount=body['amount'],
-        owner=body['owner'],
-        ownerName=body['ownerName'],
-        marketplace=body['marketplace']
+        time = getIsoFormatNow(),
+        sku = sku,
+        itemCondition = body['itemCondition'],
+        comment = body['comment'],
+        link = body['link'],
+        platform = body['platform'],
+        shelfLocation = body['shelfLocation'],
+        amount = body['amount'],
+        owner = body['owner'],
+        ownerName = body['ownerName'],
+        marketplace = body['marketplace']
     )
     # pymongo need dict or bson object
     res = qa_collection.insert_one(newInventory.__dict__)
@@ -224,12 +222,11 @@ def deleteInventoryBySku(request):
     if not sku:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
     
-    # pull time
+    # pull time created
     res = qa_collection.find_one({'sku': sku}, {'time': 1})
     if not res:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
-
     # calculate time left to delete, prevent delete if result delta seconds is negative
     # convert form time string to time obj
     timeCreated = convertToTime(res['time'])
@@ -239,7 +236,7 @@ def deleteInventoryBySku(request):
     
     # perform deletion or throw error
     if canDel:
-        de = qa_collection.delete_one({'sku': sku})
+        qa_collection.delete_one({'sku': sku})
         return Response('Inventory Deleted', status.HTTP_200_OK)
     return Response('Cannot Delete Inventory After 24H, Please Contact Admin', status.HTTP_403_FORBIDDEN)
 
@@ -405,29 +402,29 @@ def sendCSV(request):
     # loop pandas dataframe
     for index in data.index:
         # time convert to iso format
-        # original: 12/22/2023 5:54pm
-        # targeted: 2024-01-03T05:00:00.000   optional: -05:00 (EST is -5)
-        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
+        # original: 2023-08-03 17:47:00
+        # targeted: 2024-01-03T05:00:00.000   optional time zone: -05:00 (EST is -5)
+        time = datetime.strptime(str(data['time'][index]), "%Y-%m-%d %H:%M:%S").isoformat()
         data.loc[index, 'time'] = time
         
         # remove all html tags
         # if link containes '<'
-        if '<' in data['link'][index]:
-            cleanLink = BeautifulSoup(data['link'][index], "lxml").text
-            data.loc[index, 'link'] = cleanLink
+        if '<' in data['url'][index]:
+            cleanLink = BeautifulSoup(data['url'][index], "lxml").text
+            data.loc[index, 'url'] = cleanLink
         
         # item condition set to capitalized
-        itemCondition = str(data['itemCondition'][index]).title()
-        data.loc[index, 'itemCondition'] = itemCondition
+        condition = str(data['condition'][index]).title()
+        data.loc[index, 'condition'] = condition
         
-        # platform other capitalize
-        if data['platform'][index] == 'other':
-            data.loc[index, 'platform'] = 'Other'
-        
-        # capitalize one of our employee's name
-        if data['ownerName'][index] == 'yuxiang si':
-            data.loc[index, 'ownerName'] = 'Yuxiang Si'
-        
+        # remove $ inside mrsp price
+        if 'NA' in str(data['mrsp'][index]):
+            data.loc[index, 'mrsp'] = ''
+        else:
+            mrsp = str(data['mrsp'][index]).replace('$', '')
+            mrsp = mrsp.replace(',', '')
+            data.loc[index, 'mrsp'] = float(mrsp)
+
     # set output copy path
     data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
     return Response(str(data), status.HTTP_200_OK)

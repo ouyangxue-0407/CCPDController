@@ -12,9 +12,6 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # TypeError: Missing required arguments; Expected either ('messages' and 'model') or ('messages', 'model' and 'stream') arguments to be given
 
-
-
-
 # short description (lead on auction flex max 40 char )
 def generate_short_product_title(description):
     prompt = f"You are an Auctioneer, based on the information, create a short product title. The character limit for product title is 30 byte. {description}."

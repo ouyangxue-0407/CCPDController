@@ -47,12 +47,9 @@ min_role = 4
 # user registration date format
 user_time_format = "%b %-d %Y"
 
-# Q&A table time filter format
-
-# TODO: change from zulu to est (-5:00)
-# filter_time_format = "%Y-%m-%dT%H:%M:%S.%fZ"
-filter_time_format = "%Y-%m-%dT%H:%M:%S.%f-05:00"
-
+# iso format
+# for QA inventory, table filters,
+iso_format = "%Y-%m-%dT%H:%M:%S.%f"
 
 # image blob date format
 blob_date_format = "%a %b %d %Y"
@@ -69,13 +66,9 @@ def getNDayBefore(days_before, time_str) -> str:
     blob_time = blob_time - timedelta(days=days_before)
     return blob_time.strftime(blob_date_format)
 
-# inventory time format
-# time format should match moment.js (MMM DD YYYY HH:mm:ss)
-time_format = "%b %d %Y %H:%M:%S"
-# convert from string to datetime
-# example: Thu Oct 12 18:48:49 2023
+# convert from string to iso time
 def convertToTime(time_str):
-    return datetime.strptime(time_str, time_format)
+    return datetime.strptime(time_str, iso_format)
 
 # inventory time format in eastern timezone
 def getIsoFormatNow():
