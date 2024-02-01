@@ -5,7 +5,7 @@ from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
 from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow
+from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup
 # pymongo
 db = get_db_client()
 qa_collection = db[qa_inventory_db_name]
+instock_collection = db['InstockInventory']
 user_collection = db['User']
 ua = UserAgent()
 
@@ -245,8 +246,89 @@ def deleteInventoryBySku(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def getAllShelfLocations():
-    arr = qa_collection.distinct('shelfLocation')
+    arr = instock_collection.distinct('shelfLocation')
     return Response(arr, status.HTTP_200_OK)
+
+# currPage: number
+# itemsPerPage: number
+# filter: { 
+#   timeRangeFilter: { from: string, to: string }, 
+#   conditionFilter: string, 
+#   platformFilter: string,
+#   marketplaceFilter: string,
+#   keywordFilter: string,
+#   ownerFilter: string,
+#   shelfLocationFilter: string,
+# }
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getInstockByPage(request):
+    body = decodeJSON(request.body)
+    sanitizeNumber(body['page'])
+    sanitizeNumber(body['itemsPerPage'])
+
+    query_filter = body['filter']
+    timeRange = query_filter['timeRangeFilter']
+    print(timeRange)
+
+    # strip the ilter into mongoDB query object in fil
+    fil = {}
+    # item condition filter
+    if query_filter['conditionFilter'] != '':
+        sanitizeString(query_filter['conditionFilter'])
+        fil['itemCondition'] = query_filter['conditionFilter']
+    
+    # original platform filter
+    if query_filter['platformFilter'] != '':
+        sanitizeString(query_filter['platformFilter'])
+        fil['platform'] = query_filter['platformFilter']
+    
+    # marketplace filter
+    if query_filter['marketplaceFilter'] != '':
+        sanitizeString(query_filter['marketplaceFilter'])
+        fil['marketplace'] = query_filter['marketplaceFilter']
+    
+    # time range filter
+    if timeRange != {}:
+        sanitizeString(timeRange['from'])
+        sanitizeString(timeRange['to'])
+        fil['time'] = {
+            # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
+            '$gte': timeRange['from'],
+            '$lt': timeRange['to']
+        }
+    print(fil)
+    
+    try:
+        arr = []
+        skip = body['page'] * body['itemsPerPage']
+        
+        # see if filter is applied to determine the query
+        if fil == {}:
+            query = qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = qa_collection.count_documents({})
+        else:
+            query = qa_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = qa_collection.count_documents(fil)
+
+        # get rid of object id
+        for inventory in query:
+            inventory['_id'] = str(inventory['_id'])
+            arr.append(inventory)
+                
+        # if pulled array empty return no content
+        if len(arr) == 0:
+            return Response([], status.HTTP_200_OK)
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
+
+
+'''
+Scraping stuff 
+'''
+
 
 # description: string
 @api_view(['GET'])
@@ -372,8 +454,6 @@ def scrapePriceBySkuHomeDepot(request):
     # HD Canada itemprop="price"
     # <span itemprop="price">44.98</span>
     # HD US className = ????
-    
-    
 
     # grab the fist span element encountered tagged with class 'a-price-whole' and extract the text
     price = response.selector.xpath('//span/text()').extract()
@@ -384,10 +464,69 @@ def scrapePriceBySkuHomeDepot(request):
     return Response(price, status.HTTP_200_OK)
 
 
+# for instock record csv processing to mongo db
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def sendCSV(request):
+def sendInstockCSV(request):
+    body = decodeJSON(request.body)
+    path = body['path']
+
+    # joint file location with relative path
+    dirName = os.path.dirname(__file__)
+    fileName = os.path.join(dirName, path)
+    print(getIsoFormatNow())
+    
+    # parse csv to pandas data frame
+    data = pd.read_csv(filepath_or_buffer=fileName)
+    
+    # loop pandas dataframe
+    for index in data.index:
+        # if time is malformed set to empty string
+        if len(str(data['time'][index])) < 19 or '0000-00-00 00:00:00':
+            data.loc[index, 'time'] = ''
+        else:
+            # time convert to iso format
+            # original: 2023-08-03 17:47:00
+            # targeted: 2024-01-03T05:00:00.000
+            time = datetime.strptime(str(data['time'][index]), "%Y-%m-%d %H:%M:%S").isoformat()
+            data.loc[index, 'time'] = time
+        
+        # check url is http
+        if 'http' not in str(data['url'][index]) or len(str(data['url'][index])) < 15 or '<' in str(data['url'][index]):
+            data.loc[index, 'url'] = ''
+        
+        condition = str(data['condition'][index]).title().strip()
+        
+        # condition
+        if 'A-B' in condition:
+            data.loc[index, 'condition'] = 'A-B'
+        elif 'API' in condition:
+            data.loc[index, 'condition'] = 'New'
+        elif 'NO MANUAL' in condition:
+            data.loc[index, 'condition'] = 'New'
+        else:
+            # item condition set to capitalized
+            data.loc[index, 'condition'] = condition
+
+            
+        # remove $ inside mrsp price
+        if 'NA' in str(data['mrsp'][index]) or '***Need Price***' in str(data['mrsp'][index]):
+            data.loc[index, 'mrsp'] = ''
+        else:
+            mrsp = str(data['mrsp'][index]).replace('$', '')
+            mrsp = mrsp.replace(',', '')
+            data.loc[index, 'mrsp'] = float(mrsp)
+
+    # set output copy path
+    data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
+    return Response(str(data), status.HTTP_200_OK)
+
+# for qa record csv processing to mongo db
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def sendQACSV(request):
     body = decodeJSON(request.body)
     path = body['path']
 
@@ -404,26 +543,22 @@ def sendCSV(request):
         # time convert to iso format
         # original: 2023-08-03 17:47:00
         # targeted: 2024-01-03T05:00:00.000   optional time zone: -05:00 (EST is -5)
-        time = datetime.strptime(str(data['time'][index]), "%Y-%m-%d %H:%M:%S").isoformat()
+        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
         data.loc[index, 'time'] = time
         
         # remove all html tags
         # if link containes '<'
-        if '<' in data['url'][index]:
-            cleanLink = BeautifulSoup(data['url'][index], "lxml").text
-            data.loc[index, 'url'] = cleanLink
+        if '<' in data['link'][index]:
+            cleanLink = BeautifulSoup(data['link'][index], "lxml").text
+            data.loc[index, 'link'] = cleanLink
         
         # item condition set to capitalized
-        condition = str(data['condition'][index]).title()
-        data.loc[index, 'condition'] = condition
+        condition = str(data['itemCondition'][index]).title()
+        data.loc[index, 'itemCondition'] = condition
         
-        # remove $ inside mrsp price
-        if 'NA' in str(data['mrsp'][index]):
-            data.loc[index, 'mrsp'] = ''
-        else:
-            mrsp = str(data['mrsp'][index]).replace('$', '')
-            mrsp = mrsp.replace(',', '')
-            data.loc[index, 'mrsp'] = float(mrsp)
+        # platform other capitalize
+        if data['platform'][index] == 'other':
+            data.loc[index, 'platform'] = 'Other'
 
     # set output copy path
     data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)

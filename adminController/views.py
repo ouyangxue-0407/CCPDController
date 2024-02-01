@@ -255,6 +255,12 @@ def deleteInvitationCode(request):
 
 # currPage: number
 # itemsPerPage: number
+# filter: { 
+#   timeRangeFilter: { from: string, to: string }, 
+#   conditionFilter: string, 
+#   platformFilter: string, 
+#   marketplaceFilter: string 
+# }
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
@@ -284,8 +290,8 @@ def getQARecordsByPage(request):
     if timeRange != {}:
         sanitizeString(timeRange['from'])
         sanitizeString(timeRange['to'])
-        gt = datetime.fromisoformat(timeRange['from'][:-1])
-        lt = datetime.fromisoformat(timeRange['to'][:-1])
+        # gt = datetime.fromisoformat(timeRange['from'][:-1])
+        # lt = datetime.fromisoformat(timeRange['to'][:-1])
         fil['time'] = {
             # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
             '$gte': timeRange['from'],
