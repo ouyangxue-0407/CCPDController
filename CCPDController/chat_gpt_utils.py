@@ -12,6 +12,17 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # TypeError: Missing required arguments; Expected either ('messages' and 'model') or ('messages', 'model' and 'stream') arguments to be given
 
+# convert QA record comment to inventory comment
+def convertInitials(input_str: str) -> str:
+    input_str = input_str.replace("UT.","UNTEST ")
+    input_str = input_str.replace("MP.","MISSING PARTS ")
+    input_str = input_str.replace("FT.","FUNCTION TEST ")
+    input_str = input_str.replace("SI.","IMAGE SHOW SIMILAR ITEM ")
+    input_str = input_str.replace("PT.","POWER TEST ")
+    input_str = input_str.replace("API.","ALL PARTS IN ")
+    input_str = input_str.replace("MA.","MISSING ACCESSORIES ")
+    return input_str
+
 # short description (lead on auction flex max 40 char )
 def generate_short_product_title(description):
     prompt = f"You are an Auctioneer, based on the information, create a short product title. The character limit for product title is 30 byte. {description}."
@@ -29,7 +40,7 @@ def generate_short_product_title(description):
 
 # full description
 def generate_full_product_title(comment, description):
-    comment = special_characters_convert_c(comment)
+    comment = convertInitials(comment)
     prompt = (
         f"Additional Condition: {comment}."
         f"Item information: {description}."
@@ -46,21 +57,6 @@ def generate_full_product_title(comment, description):
     print(res)
     Newdescription = res.choices[0].text.strip()
     return Newdescription
-
-# convert initial to full word
-def special_characters_convert_c(comment):
-    comment = comment
-    try:
-        comment = comment.replace("UT.","UNTEST ")
-        comment = comment.replace("MP.","MISSING PARTS ")
-        comment = comment.replace("FT.","FUNCTION TEST ")
-        comment = comment.replace("SI.","IMAGE SHOW SIMILAR ITEM ")
-        comment = comment.replace("PT.","POWER TEST ")
-        comment = comment.replace("API.","ALL PARTS IN ")
-        comment = comment.replace("MA.","MISSING ACCESSORIES ")
-        return comment
-    except:
-        raise TypeError("Only string comments are allowed")
 
 def special_characters_convert_d(description):
         try:

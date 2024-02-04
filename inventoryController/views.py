@@ -4,7 +4,7 @@ from time import time, ctime
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
 from inventoryController.models import InventoryItem
-from CCPDController.scrape_utils import extract_urls, getImageUrl, getMrsp, getTitle
+from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
@@ -15,6 +15,7 @@ from fake_useragent import UserAgent
 from bson.objectid import ObjectId
 from collections import Counter
 from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
+from unpack_filter import unpackInstockFilter
 import pymongo
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -34,12 +35,15 @@ ua = UserAgent()
 def getInventoryBySku(request):
     try:
         body = decodeJSON(request.body)
-        sku = sanitizeSku(body['sku'])
+        sku = sanitizeNumber(int(body['sku']))
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
     # find the Q&A record
-    res = qa_collection.find_one({'sku': sku}, {'_id': 0})
+    try:
+        res = qa_collection.find_one({'sku': sku}, {'_id': 0})
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     if not res:
         return Response('Record Not Found', status.HTTP_400_BAD_REQUEST)
     
@@ -245,8 +249,11 @@ def deleteInventoryBySku(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllShelfLocations():
-    arr = instock_collection.distinct('shelfLocation')
+def getAllShelfLocations(request):
+    try:
+        arr = instock_collection.distinct('shelfLocation')
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
 
 # currPage: number
@@ -256,61 +263,34 @@ def getAllShelfLocations():
 #   conditionFilter: string, 
 #   platformFilter: string,
 #   marketplaceFilter: string,
-#   keywordFilter: string,
 #   ownerFilter: string,
-#   shelfLocationFilter: string,
+#   shelfLocationFilter: string[],
+#   keywordFilter: string[],
 # }
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def getInstockByPage(request):
     body = decodeJSON(request.body)
     sanitizeNumber(body['page'])
     sanitizeNumber(body['itemsPerPage'])
-
     query_filter = body['filter']
-    timeRange = query_filter['timeRangeFilter']
-    print(timeRange)
 
-    # strip the ilter into mongoDB query object in fil
     fil = {}
-    # item condition filter
-    if query_filter['conditionFilter'] != '':
-        sanitizeString(query_filter['conditionFilter'])
-        fil['itemCondition'] = query_filter['conditionFilter']
+    fil = unpackInstockFilter(query_filter, fil)
     
-    # original platform filter
-    if query_filter['platformFilter'] != '':
-        sanitizeString(query_filter['platformFilter'])
-        fil['platform'] = query_filter['platformFilter']
-    
-    # marketplace filter
-    if query_filter['marketplaceFilter'] != '':
-        sanitizeString(query_filter['marketplaceFilter'])
-        fil['marketplace'] = query_filter['marketplaceFilter']
-    
-    # time range filter
-    if timeRange != {}:
-        sanitizeString(timeRange['from'])
-        sanitizeString(timeRange['to'])
-        fil['time'] = {
-            # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
-            '$gte': timeRange['from'],
-            '$lt': timeRange['to']
-        }
     print(fil)
-    
     try:
         arr = []
         skip = body['page'] * body['itemsPerPage']
         
         # see if filter is applied to determine the query
         if fil == {}:
-            query = qa_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = qa_collection.count_documents({})
+            query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = instock_collection.count_documents({})
         else:
-            query = qa_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = qa_collection.count_documents(fil)
+            query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = instock_collection.count_documents(fil)
 
         # get rid of object id
         for inventory in query:
@@ -324,12 +304,28 @@ def getInstockByPage(request):
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
 
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getInstockBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        res = instock_collection.find_one({'sku': sku}, {'_id': 0})
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    if not res:
+        return Response('No Instock Record Found', status.HTTP_404_NOT_FOUND)
+    return Response(res, status.HTTP_200_OK)
+
 
 '''
 Scraping stuff 
 '''
-
-
 # description: string
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
@@ -353,9 +349,9 @@ def generateDescriptionBySku(request):
     
     return Response(lead, status.HTTP_200_OK)
 
-# return mrsp from amazon for given sku
+# return msrp from amazon for given sku
 # sku: string
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def scrapeInfoBySkuAmazon(request):
@@ -364,21 +360,19 @@ def scrapeInfoBySkuAmazon(request):
         sku = sanitizeNumber(int(body['sku']))
     except:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
-    
+        
     # find target inventory
     target = qa_collection.find_one({ 'sku': sku })
     if not target:
         return Response('No Such Inventory', status.HTTP_404_NOT_FOUND)
 
+    # extract link with regex
     # return error if not amazon link or not http
-    link = target['link']
+    link = extract_urls(target['link'])
     if 'https' not in link and '.ca' not in link and '.com' not in link:
         return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
     if 'a.co' not in link and 'amazon' not in link:
         return Response('Invalid URL, Not Amazon URL', status.HTTP_400_BAD_REQUEST)
-    
-    # extract the first http url
-    link = extract_urls(link)
     
     # generate header with random user agent
     headers = {
@@ -390,7 +384,7 @@ def scrapeInfoBySkuAmazon(request):
     # TODO: use 10 proxy service to incraese scraping speed
     payload = {
         'title': '',
-        'mrsp': '',
+        'msrp': '',
         'imgUrl': ''
     }
     
@@ -402,16 +396,22 @@ def scrapeInfoBySkuAmazon(request):
     except:
         return Response('Failed to Get Title', status.HTTP_500_INTERNAL_SERVER_ERROR)
     try:
-        payload['mrsp'] = getMrsp(response)
+        payload['msrp'] = getMsrp(response)
     except:
-        return Response('Failed to Get MRSP', status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response('Failed to Get MSRP', status.HTTP_500_INTERNAL_SERVER_ERROR)
     try:
         payload['imgUrl'] = getImageUrl(response)
     except:
         return Response('No Image URL Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    # try:
+    payload['currency'] = getCurrency(response)
+    # except:
+    # return Response('No Currency Info Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     return Response(payload, status.HTTP_200_OK)
 
-# return mrsp from home depot for given sku
+# return msrp from home depot for given sku
 # sku: string
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
@@ -508,15 +508,14 @@ def sendInstockCSV(request):
         else:
             # item condition set to capitalized
             data.loc[index, 'condition'] = condition
-
             
-        # remove $ inside mrsp price
-        if 'NA' in str(data['mrsp'][index]) or '***Need Price***' in str(data['mrsp'][index]):
-            data.loc[index, 'mrsp'] = ''
+        # remove $ inside msrp price
+        if 'NA' in str(data['msrp'][index]) or '***Need Price***' in str(data['msrp'][index]):
+            data.loc[index, 'msrp'] = ''
         else:
-            mrsp = str(data['mrsp'][index]).replace('$', '')
-            mrsp = mrsp.replace(',', '')
-            data.loc[index, 'mrsp'] = float(mrsp)
+            msrp = str(data['msrp'][index]).replace('$', '')
+            msrp = msrp.replace(',', '')
+            data.loc[index, 'msrp'] = float(msrp)
 
     # set output copy path
     data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
@@ -563,3 +562,17 @@ def sendQACSV(request):
     # set output copy path
     data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
     return Response(str(data), status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def fillPlatform(request):
+    # myquery = { 
+    #     # "link": { "$regex": "ebay" },
+    #     "link": {"$not": {"$regex": "www.ebay"}}, 
+    #     "platform": "eBay"
+    # }
+    # newvalues = { "$set": { "platform": "Amazon" } }
+    # res = qa_collection.update_many(myquery, newvalues)
+    return Response('Platform Filled', status.HTTP_200_OK)

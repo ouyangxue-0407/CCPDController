@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta, date
+from inventoryController.unpack_filter import unpackQARecordFilter
 from userController.models import User
 from .models import InvitationCode, RetailRecord
 from rest_framework import status
@@ -265,42 +266,18 @@ def deleteInvitationCode(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def getQARecordsByPage(request):
-    # try:
-    body = decodeJSON(request.body)
-    sanitizeNumber(body['page'])
-    sanitizeNumber(body['itemsPerPage'])
+    try:
+        body = decodeJSON(request.body)
+        sanitizeNumber(body['page'])
+        sanitizeNumber(body['itemsPerPage'])
+        query_filter = body['filter']
 
-    query_filter = body['filter']
-    print(query_filter)
-    
-    timeRange = query_filter['timeRangeFilter']
-    print(timeRange)
-
-    # strip the ilter into mongoDB query object in fil
-    fil = {}
-    if query_filter['conditionFilter'] != '':
-        sanitizeString(query_filter['conditionFilter'])
-        fil['itemCondition'] = query_filter['conditionFilter']
-    if query_filter['platformFilter'] != '':
-        sanitizeString(query_filter['platformFilter'])
-        fil['platform'] = query_filter['platformFilter']
-    if query_filter['marketplaceFilter'] != '':
-        sanitizeString(query_filter['marketplaceFilter'])
-        fil['marketplace'] = query_filter['marketplaceFilter']
-    if timeRange != {}:
-        sanitizeString(timeRange['from'])
-        sanitizeString(timeRange['to'])
-        # gt = datetime.fromisoformat(timeRange['from'][:-1])
-        # lt = datetime.fromisoformat(timeRange['to'][:-1])
-        fil['time'] = {
-            # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
-            '$gte': timeRange['from'],
-            '$lt': timeRange['to']
-        }
-    print(fil)
-    
-    # except:
-    #     return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
+        # strip the ilter into mongoDB query object in fil
+        fil = {}
+        unpackQARecordFilter(query_filter, fil)
+        print(fil)
+    except:
+        return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
     
     try:
         arr = []

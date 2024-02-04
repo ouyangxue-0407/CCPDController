@@ -36,6 +36,13 @@ def extract_urls(input):
     regex = re.compile(r'https?://\S+')
     return [word for word in words if regex.match(word)][0]
 
+# returns children of top nav bar/belt
+def getNavBelt(response):
+    children = response.xpath(f'//div[@class="nav-right"]/child::*')
+    if len(children) < 1:
+        raise Exception('No right nav belt found')
+    return children
+
 # takes scrapy HtmlResponse generated from rawHTML
 # return array of center col's children tags
 def getCenterCol(response):
@@ -63,10 +70,10 @@ def getTitle(response) -> str:
     return title
 
 # takes rawHTML str and returns:
-# - mrsp in float 
-# - mrsp range in array of float
+# - msrp in float 
+# - msrp range in array of float
 # - or price unavailable string
-def getMrsp(response):
+def getMsrp(response):
     center = getCenterCol(response)
     right = getRightCol(response)
     
@@ -84,7 +91,7 @@ def getMrsp(response):
     # Currently unavailable in right col set
 
     # grab price in span tag 
-    # mrsp whole joint by fraction
+    # msrp whole joint by fraction
     integer = center.xpath(f'//span[has-class("{priceWholeClass}")]/text()').extract()
     decimal = center.xpath(f'//span[has-class("{priceFractionClass}")]/text()').extract()
     if integer and decimal:
@@ -110,3 +117,29 @@ def getImageUrl(response):
         res = http_pattern.findall(img)
         # return res[:2] # for both lq and hq image
         return res[1]
+
+# look for US and CA flag
+# <i class="icp-flyout-flag icp-flyout-flag-ca"></i>
+# US: icp-flyout-flag-us
+# CA: icp-flyout-flag-ca
+def getCurrency(response) -> str:
+    nav = getNavBelt(response)
+    flag = nav.xpath("[@id='nav-tools']")
+    print(flag)
+    
+    
+    
+    # for i in nav.xpath("//span[@class='icp-flyout-flag-us']").getall():
+    #     print(i)
+        # if 'icp-flyout-flag-us' in i:
+        #     print(i)
+        #     return i
+        # if 'icp-flyout-flag-ca' in i:
+        #     print(i)
+        #     return i
+        # if re.search('icp-flyout-flag-us', i):
+        #     print("Found 'flag-us'")
+        #     return i
+        # if re.search('icp-flyout-flag-ca', i):
+        #     print("Found 'flag-ca'")
+        #     return i
