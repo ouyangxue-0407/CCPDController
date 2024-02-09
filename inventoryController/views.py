@@ -286,8 +286,7 @@ def getInstockByPage(request):
 
     fil = {}
     fil = unpackInstockFilter(query_filter, fil)
-    
-    print(fil)
+
     # try:
     arr = []
     skip = body['page'] * body['itemsPerPage']
@@ -396,7 +395,7 @@ def generateDescriptionBySku(request):
     
     return Response(lead, status.HTTP_200_OK)
 
-# return msrp from amazon for given sku
+# return info from amazon for given sku
 # sku: string
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -418,7 +417,7 @@ def scrapeInfoBySkuAmazon(request):
     link = extract_urls(target['link'])
     if 'https' not in link and '.ca' not in link and '.com' not in link:
         return Response('Invalid URL', status.HTTP_400_BAD_REQUEST)
-    if 'a.co' not in link and 'amazon' not in link:
+    if 'a.co' not in link and 'amazon' not in link and 'amzn' not in link:
         return Response('Invalid URL, Not Amazon URL', status.HTTP_400_BAD_REQUEST)
     
     # generate header with random user agent
@@ -432,7 +431,8 @@ def scrapeInfoBySkuAmazon(request):
     payload = {
         'title': '',
         'msrp': '',
-        'imgUrl': ''
+        'imgUrl': '',
+        'currency':''
     }
     
     # request the raw html from Amazon
@@ -451,11 +451,10 @@ def scrapeInfoBySkuAmazon(request):
     except:
         return Response('No Image URL Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    # try:
-    payload['currency'] = getCurrency(response)
-    # except:
-    # return Response('No Currency Info Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+    try:
+        payload['currency'] = getCurrency(response)
+    except:
+        return Response('No Currency Info Found', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(payload, status.HTTP_200_OK)
 
 # return msrp from home depot for given sku
@@ -616,12 +615,20 @@ def sendQACSV(request):
 @permission_classes([IsAdminPermission])
 def fillPlatform(request):
     # find
-    myquery = { 
-        "link": {"$not": {"$regex": "www.ebay"}}, 
-        "platform": "eBay"
+    myquery = {
+       '$nor': [
+           {'url': {"$regex": "ebay"}}, 
+           {'url': {"$regex": "homedepot"}}, 
+           {'url': {"$regex": "amazon"}}, 
+           {'url': {"$regex": "a.co"}}, 
+           {'url': {"$regex": "amzn"}}, 
+           {'url': {"$regex": "ebay"}}, 
+           {'url': {"$regex": "aliexpress"}},
+           {'url': {"$regex": "walmart"}}
+        ], 
     }
-    
+
     # set
-    newvalues = { "$set": { "platform": "Amazon" } }
-    res = qa_collection.update_many(myquery, newvalues)
+    newvalues = { "$set": { "platform": "Other" }}
+    res = instock_collection.update_many(myquery, newvalues)
     return Response('Platform Filled', status.HTTP_200_OK)

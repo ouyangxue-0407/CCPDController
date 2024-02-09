@@ -43,7 +43,7 @@ def unpackInstockFilter(query_filter, fil):
             case 'out':
                 fil['quantityInstock'] = { '$lte': 0 }
             case '':
-                pass    
+                pass
     
     # create $and array
     if '$and' not in fil:
@@ -52,30 +52,26 @@ def unpackInstockFilter(query_filter, fil):
     # item condition filter
     if 'conditionFilter' in query_filter and query_filter['conditionFilter'] != '':
         sanitizeString(query_filter['conditionFilter'])
-        # fil['condition'] = query_filter['conditionFilter']
         fil['$and'].append({'condition': query_filter['conditionFilter']})
     
     # original platform filter
     if 'platformFilter' in query_filter and query_filter['platformFilter'] != '':
         sanitizeString(query_filter['platformFilter'])
-        # fil['platform'] = query_filter['platformFilter']
         fil['$and'].append({'platform': query_filter['platformFilter']})
         
     
     # marketplace filter
     if 'marketplaceFilter' in query_filter and query_filter['marketplaceFilter'] != '':
         sanitizeString(query_filter['marketplaceFilter'])
-        # fil['marketplace'] = query_filter['marketplaceFilter']
         fil['$and'].append({'marketplace': query_filter['marketplaceFilter']})
         
 
     # qa personal filter
     if 'qaFilter' in query_filter and len(query_filter['qaFilter']) > 0:
         qaf = { '$or': [] }
-        # { '$or': [] }
         for name in query_filter['qaFilter']:
             n = sanitizeString(name)
-            qaf['$or'].append({'qaName': n})
+            qaf['$or'].append({ 'qaName': n })
         fil['$and'].append(qaf)
     
     # admin filter
@@ -83,7 +79,7 @@ def unpackInstockFilter(query_filter, fil):
         adf = { '$or': [] }
         for name in query_filter['adminFilter']:
             n = sanitizeString(name)
-            adf['$or'].append({'adminName': n})
+            adf['$or'].append({ 'adminName': n })
         fil['$and'].append(adf)
 
     # shelf location Filter
@@ -91,7 +87,7 @@ def unpackInstockFilter(query_filter, fil):
         shf = { '$or': [] }
         for loc in query_filter['shelfLocationFilter']:
             l = sanitizeString(loc)
-            shf['$or'].append(l)
+            shf['$or'].append({ 'shelfLocation': l })
         fil['$and'].append(shf)
             
     # keyword filter

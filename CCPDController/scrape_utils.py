@@ -1,8 +1,6 @@
 import re
 import time
 import random
-import requests
-from fake_useragent import UserAgent
 
 # Amazon scrapping utils 
 # works for both Amazon CA nad US
@@ -26,16 +24,24 @@ priceRangeClass = 'a-price-range'
 # image container class
 imageContainerClass = 'imgTagWrapper'
 
-
 # random wait time between scrape
 random_wait = lambda : time.sleep(random.randint(30, 50))
 
 # extract url from string using regex
 def extract_urls(input):
-    words = input.split()
-    regex = re.compile(r'https?://\S+')
-    return [word for word in words if regex.match(word)][0]
-
+    try:
+        words = input.split()
+        regex = re.compile(r'https?://\S+')
+        return [word for word in words if regex.match(word)][0]
+    except:
+        # Search for the URL in the string
+        match = re.search(r'https?://\S+', input)
+        if match:
+            found_url = match.group()
+            return found_url
+        else:
+            return 'No URL Found'
+            
 # returns children of top nav bar/belt
 def getNavBelt(response):
     children = response.xpath(f'//div[@class="nav-right"]/child::*')
@@ -120,26 +126,45 @@ def getImageUrl(response):
 
 # look for US and CA flag
 # <i class="icp-flyout-flag icp-flyout-flag-ca"></i>
-# US: icp-flyout-flag-us
-# CA: icp-flyout-flag-ca
+# <span class="icp-nav-flag icp-nav-flag-ca icp-nav-flag-lop"></span>
+
+# US flag class: 
+# icp-flyout-flag-us
+# icp-nav-flag-us
+# flag-us
+
+# CA flag class: 
+# icp-flyout-flag-ca
+# icp-nav-flag-ca
+# flag-ca
+
+# UK flag class: 
+# icp-flyout-flag-gb
+# icp-nav-flag-gb
+# flag-gb
+
 def getCurrency(response) -> str:
+    # grab nav belt
     nav = getNavBelt(response)
-    flag = nav.xpath("")
-    print(flag)
     
+    # init indicator to 0
+    us_exist = 0
+    ca_exist = 0
+    gb_exist = 0
     
-    
-    # for i in nav.xpath("//span[@class='icp-flyout-flag-us']").getall():
-    #     print(i)
-        # if 'icp-flyout-flag-us' in i:
-        #     print(i)
-        #     return i
-        # if 'icp-flyout-flag-ca' in i:
-        #     print(i)
-        #     return i
-        # if re.search('icp-flyout-flag-us', i):
-        #     print("Found 'flag-us'")
-        #     return i
-        # if re.search('icp-flyout-flag-ca', i):
-        #     print("Found 'flag-ca'")
-        #     return i
+    # grab nav-tools div
+    for e in nav.xpath(f'//div[@id="nav-tools"]/child::*').getall():
+        if len(re.findall('flag-us', e)) > 0:
+            us_exist = 1
+        if len(re.findall('flag-ca', e)) > 0:
+            ca_exist = 1
+        if len(re.findall('flag-gb', e)) > 0:
+            gb_exist = 1
+
+    if us_exist > 0:
+        return 'USD'
+    if ca_exist > 0:
+        return 'CAD'
+    if gb_exist > 0:
+        return 'GBP'
+    return 'No currency info'
