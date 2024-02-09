@@ -15,7 +15,7 @@ from fake_useragent import UserAgent
 from bson.objectid import ObjectId
 from collections import Counter
 from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
-from unpack_filter import unpackInstockFilter
+from inventoryController.unpack_filter import unpackInstockFilter
 import pymongo
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -27,6 +27,10 @@ instock_collection = db['InstockInventory']
 user_collection = db['User']
 ua = UserAgent()
 
+
+'''
+QA Inventory stuff
+'''
 # query param sku for inventory db row
 # sku: string
 @api_view(['POST'])
@@ -139,7 +143,7 @@ def createInventory(request):
     #     return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
     return Response('Inventory Created', status.HTTP_200_OK)
 
-# query param sku and body of new inventory info
+# update qa record by sku
 # sku: string
 # newInventory: Inventory
 """
@@ -256,6 +260,10 @@ def getAllShelfLocations(request):
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
 
+
+'''
+In-stock stuff
+'''
 # currPage: number
 # itemsPerPage: number
 # filter: { 
@@ -280,28 +288,28 @@ def getInstockByPage(request):
     fil = unpackInstockFilter(query_filter, fil)
     
     print(fil)
-    try:
-        arr = []
-        skip = body['page'] * body['itemsPerPage']
-        
-        # see if filter is applied to determine the query
-        if fil == {}:
-            query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = instock_collection.count_documents({})
-        else:
-            query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = instock_collection.count_documents(fil)
+    # try:
+    arr = []
+    skip = body['page'] * body['itemsPerPage']
+    
+    # see if filter is applied to determine the query
+    if fil == {}:
+        query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        count = instock_collection.count_documents({})
+    else:
+        query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        count = instock_collection.count_documents(fil)
 
-        # get rid of object id
-        for inventory in query:
-            inventory['_id'] = str(inventory['_id'])
-            arr.append(inventory)
-                
-        # if pulled array empty return no content
-        if len(arr) == 0:
-            return Response([], status.HTTP_200_OK)
-    except:
-        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # get rid of object id
+    for inventory in query:
+        inventory['_id'] = str(inventory['_id'])
+        arr.append(inventory)
+            
+    # if pulled array empty return no content
+    if len(arr) == 0:
+        return Response([], status.HTTP_200_OK)
+    # except:
+    #     return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
 
 @api_view(['POST'])
@@ -321,6 +329,45 @@ def getInstockBySku(request):
     if not res:
         return Response('No Instock Record Found', status.HTTP_404_NOT_FOUND)
     return Response(res, status.HTTP_200_OK)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def updateInstockBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    # check if inventory exists
+    oldInv = instock_collection.find_one({ 'sku': sku })
+    if not oldInv:
+        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
+        
+    # construct $set data according to body
+    setData = {}
+    if body['quantityInstock']:
+        setData['quantityInstock'] = sanitizeNumber(body['quantityInstock'])
+    setData['condition'] = sanitizeNumber(body['condition'])
+    setData['platform'] = sanitizeNumber(body['platform'])
+    setData['msrp'] = sanitizeString(body['msrp'])
+    setData['shelfLocation'] = sanitizeString(body['shelfLocation'])
+    setData['comment'] = sanitizeString(body['comment'])
+    setData['description'] = sanitizeString(body['description'])
+    setData['url'] = sanitizeString(body['url'])
+    
+    
+    # update inventory
+    res = instock_collection.update_one(
+        { 'sku': sku },
+        { '$set': setData }
+    )
+    
+    # return update status 
+    if not res:
+        return Response('Update Failed', status.HTTP_404_NOT_FOUND)
+    return Response('Update Success', status.HTTP_200_OK)
 
 
 '''
@@ -568,11 +615,13 @@ def sendQACSV(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def fillPlatform(request):
-    # myquery = { 
-    #     # "link": { "$regex": "ebay" },
-    #     "link": {"$not": {"$regex": "www.ebay"}}, 
-    #     "platform": "eBay"
-    # }
-    # newvalues = { "$set": { "platform": "Amazon" } }
-    # res = qa_collection.update_many(myquery, newvalues)
+    # find
+    myquery = { 
+        "link": {"$not": {"$regex": "www.ebay"}}, 
+        "platform": "eBay"
+    }
+    
+    # set
+    newvalues = { "$set": { "platform": "Amazon" } }
+    res = qa_collection.update_many(myquery, newvalues)
     return Response('Platform Filled', status.HTTP_200_OK)

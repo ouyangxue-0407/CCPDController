@@ -124,7 +124,7 @@ def getImageUrl(response):
 # CA: icp-flyout-flag-ca
 def getCurrency(response) -> str:
     nav = getNavBelt(response)
-    flag = nav.xpath("[@id='nav-tools']")
+    flag = nav.xpath("")
     print(flag)
     
     

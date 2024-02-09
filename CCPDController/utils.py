@@ -52,7 +52,10 @@ user_time_format = "%b %-d %Y"
 iso_format = "%Y-%m-%dT%H:%M:%S.%f"
 
 # image blob date format
-blob_date_format = "%a %b %d %Y"
+# 2023-11-30
+# the date have to be 1 digit
+# blob_date_format = "%a %b %d %Y"
+blob_date_format = "%Y-%m-%d"
 
 # return blob time string with format of blob date format
 def getBlobTimeString() -> str:
@@ -178,13 +181,15 @@ def sanitizeInvitationCode(code):
 # make sure string is type str and no $ included 
 def sanitizeString(field):
     if not isinstance(field, str):
-        raise TypeError('Invalid Information')
+        raise TypeError('Invalid String')
+    if len(field) > 600:
+        raise TypeError('Input Too Long')
     return field.replace('$', '')
 
 # makesure number is int and no $
 def sanitizeNumber(num):
-    if not isinstance(num, int):
-        raise TypeError('Invalid Information')
+    if not isinstance(num, int) and not isinstance(num, float):
+        raise TypeError('Invalid Number')
     return num
 
 # sanitize all field in user info body

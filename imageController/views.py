@@ -40,18 +40,17 @@ def getUrlsByOwner(request):
         body = decodeJSON(request.body)
         sanitizeString(body['ownerName'])
     except:
-        return Response('Invalid Owner Id', status.HTTP_400_BAD_REQUEST)
+        return Response('Invalid Owner', status.HTTP_400_BAD_REQUEST)
     
-    # format: Wed Jan 10 2024
+    # format: 2024-02-06
     # filter image created within 2 days
-    time = "\"time\">='" + getNDayBefore(2, getBlobTimeString()) + "'"
+    time = f"\"time\">='{getNDayBefore(2, getBlobTimeString())}'"
     # search by owner ID
-    # owner = "\"owner\"='" + body['owner'] + "'"
     # search by owner name
     owner = "\"ownerName\"='" + body['ownerName'] + "'"
     query = owner + " AND " + time
     print(query)
-
+    
     # collection of blobs
     blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=query)
     
@@ -103,7 +102,7 @@ def uploadImage(request, ownerId, owner, sku):
     # azure allow tags on each blob
     inventory_tags = {
         "sku": sku, 
-        "time": getBlobTimeString(), # format: Wed Jan 10 2024
+        "time": getBlobTimeString(), # format: 2024-02-06
         "owner": ownerId,
         "ownerName": owner
     }

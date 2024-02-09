@@ -12,6 +12,7 @@ urlpatterns = [
     path('getAllUserInfo', views.getAllUserInfo, name="getAllUserInfo"),
     path('getAllInvitationCode', views.getAllInvitationCode, name="getAllInvitationCode"),
     path('deleteInvitationCode', views.deleteInvitationCode, name="deleteInvitationCode"),
+    path('getInstockDistinct', views.getInstockDistinct, name="getInstockDistinct"),
     path('getQARecordsByPage', views.getQARecordsByPage, name="getQARecordsByPage"),
     path('deleteQARecordsBySku/<str:sku>', views.deleteQARecordsBySku, name="deleteQARecordsBySku"),
     path('getQARecordBySku/<str:sku>', views.getQARecordBySku, name="getQARecordBySku"),

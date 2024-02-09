@@ -34,7 +34,7 @@ db = get_db_client()
 user_collection = db['User']
 qa_collection = db[qa_inventory_db_name]
 inv_code_collection = db['Invitations']
-instock_collection = db['Instock']
+instock_collection = db['InstockInventory']
 retail_collection = db['Retail']
 return_collection = db['Return']
 
@@ -118,6 +118,10 @@ def adminLogin(request):
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire, samesite="None", secure=True)
     return response
 
+
+'''
+User manager stuff
+'''
 # create user with custom roles 
 @csrf_protect
 @api_view(['POST'])
@@ -254,13 +258,32 @@ def deleteInvitationCode(request):
         return Response('Delete Failed', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Code Deleted!', status.HTTP_200_OK)
 
+# get distinct field from instock db
+# get all distinct admin name in instock db
+# get all distinct QA name in instock db
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getInstockDistinct(request):
+    # try:
+    body = decodeJSON(request.body)
+    dist = sanitizeString(body['distinct'])
+    res = instock_collection.distinct(str(dist))
+    # except:
+    #     return Response('Cannot Pull From Database', status.HTTP_400_BAD_REQUEST)
+    return Response(res, status.HTTP_200_OK)
+    
+
+'''
+QA inventory stuff
+'''
 # currPage: number
 # itemsPerPage: number
 # filter: { 
-#   timeRangeFilter: { from: string, to: string }, 
-#   conditionFilter: string, 
-#   platformFilter: string, 
-#   marketplaceFilter: string 
+#   timeRangeFilter: { from: str, to: str }, 
+#   conditionFilter: str, 
+#   platformFilter: str, 
+#   marketplaceFilter: str 
 # }
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -301,7 +324,6 @@ def getQARecordsByPage(request):
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
 
-
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
@@ -319,6 +341,7 @@ def deleteQARecordsBySku(request, sku):
         return Response('Failed Deleting From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response('Inventory Deleted', status.HTTP_200_OK)
 
+# sku: str
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
@@ -337,6 +360,45 @@ def getQARecordBySku(request, sku):
         return Response('Failed Querying Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(res, status.HTTP_200_OK)
 
+# currPage: str
+# itemsPerPage: str
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getProblematicRecords(request):
+    arr = []
+    for item in qa_collection.find({ 'problem': True }).sort('sku', pymongo.DESCENDING):
+        item['_id'] = str(item['_id'])
+        arr.append(item)
+    
+    return Response(arr, status.HTTP_200_OK)
+
+# set problem to true for qa records
+# isProblem: bool
+@api_view(['PATCH'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def setProblematicBySku(request, sku):
+    try:
+        body = decodeJSON(request.body)
+        sanitizeNumber(int(sku))
+        isProblem = bool(body['isProblem'])
+    except:
+        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
+
+    # update record
+    res = qa_collection.update_one(
+        { 'sku': int(sku) },
+        { '$set': {'problem': isProblem} },
+    )
+    if not res:
+        return Response('Cannot Modify Records', status.HTTP_500_INTERNAL_SERVER_ERROR)    
+    return Response('Record Set', status.HTTP_200_OK)
+
+
+'''
+Retail and return stuff
+'''
 # page: number
 # itemsPerPage: number
 @api_view(['POST'])
@@ -418,39 +480,3 @@ def getSalesRecordsBySku(request, sku):
 @permission_classes([IsAdminPermission])
 def createReturnRecord(request):
     return Response('Return Record')
-
-
-# currPage: string
-# itemsPerPage: string
-@api_view(['GET'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def getProblematicRecords(request):
-    arr = []
-    for item in qa_collection.find({ 'problem': True }).sort('sku', pymongo.DESCENDING):
-        item['_id'] = str(item['_id'])
-        arr.append(item)
-    
-    return Response(arr, status.HTTP_200_OK)
-
-# set problem to true for qa records
-# isProblem: bool
-@api_view(['PATCH'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
-def setProblematicBySku(request, sku):
-    try:
-        body = decodeJSON(request.body)
-        sanitizeNumber(int(sku))
-        isProblem = bool(body['isProblem'])
-    except:
-        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
-
-    # update record
-    res = qa_collection.update_one(
-        { 'sku': int(sku) },
-        { '$set': {'problem': isProblem} },
-    )
-    if not res:
-        return Response('Cannot Modify Records', status.HTTP_500_INTERNAL_SERVER_ERROR)    
-    return Response('Record Set', status.HTTP_200_OK)
