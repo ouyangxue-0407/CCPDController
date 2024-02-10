@@ -9,6 +9,8 @@ urlpatterns = [
     path("updateInventoryBySku/<str:sku>", views.updateInventoryBySku, name="updateInventoryBySku"),
     path("getInventoryByOwnerId/<int:page>", views.getInventoryByOwnerId, name="getInventoryByOwnerId"),
     path("getInventoryInfoByOwnerId", views.getInventoryInfoByOwnerId, name="getInventoryInfoByOwnerId"),
+    path("getInventoryByOwnerName", views.getInventoryByOwnerName, name="getInventoryByOwnerName"),
+    path("getQAConditionInfoByOwnerName", views.getQAConditionInfoByOwnerName, name="getQAConditionInfoByOwnerName"),
     path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
     # instock inventory
     path("getInstockByPage", views.getInstockByPage, name="getInstockByPage"),

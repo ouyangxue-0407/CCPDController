@@ -20,4 +20,4 @@ EXPOSE 8000
 
 CMD [ "python", "manage.py", "runserver_plus", "0.0.0.0:8000" ]
 
-# CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "mysite.wsgi:application"]
+# CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "CCPDController.wsgi:application"]

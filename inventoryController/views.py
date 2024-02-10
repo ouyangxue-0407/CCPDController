@@ -105,6 +105,60 @@ def getInventoryInfoByOwnerId(request):
 
     return Response(dict(itemCount), status.HTTP_200_OK)
 
+# get all qa inventory by qa name
+# ownerName: string
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def getInventoryByOwnerName(request):
+    # try:
+    body = decodeJSON(request.body)
+    name = sanitizeString(body['ownerName'])
+    currPage = sanitizeNumber(body['page'])
+    # except:
+    #     return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+        
+    # get all qa inventory
+    # default item per page is 10
+    skip = currPage * 10
+    res = qa_collection.find({ 'ownerName': name }, { '_id': 0 }).sort('sku', pymongo.DESCENDING).skip(skip).limit(10)
+    if not res:
+        return Response('No Inventory Found', status.HTTP_200_OK)
+    
+    # make array of items
+    arr = []
+    for item in res:
+        arr.append(item)
+ 
+    return Response(arr, status.HTTP_200_OK)
+
+# get all qa inventory condition stats for graph by qa name
+# ownerName: string
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def getQAConditionInfoByOwnerName(request):
+    # try:
+    body = decodeJSON(request.body)
+    name = sanitizeString(body['ownerName'])
+    # except:
+    #     return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    arr = []
+    # array of all inventory
+    condition = []
+    con = qa_collection.find({ 'ownerName': name }, { 'itemCondition': 1 })
+    if not con:
+        return Response('No Inventory Found', status.HTTP_204_NO_CONTENT)
+    for inventory in con:
+        arr.append(inventory['itemCondition'])
+    
+    # make data object for charts
+    itemCount = Counter()
+    for condition in arr:
+        itemCount[condition] += 1   
+    return Response(dict(itemCount))
+
 # create single inventory Q&A record
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
