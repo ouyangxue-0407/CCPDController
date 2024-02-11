@@ -236,9 +236,9 @@ def updateInventoryBySku(request, sku):
             platform = newInv['platform'],
             shelfLocation = newInv['shelfLocation'],
             amount = newInv['amount'],
-            owner = newInv['owner'],
+            owner =  newInv['owner'] if 'owner' in newInv else '',
             ownerName = newInv['ownerName'],
-            marketplace = newInv['marketplace']
+            marketplace = newInv['marketplace'] if 'marketplace' in newInv else ''
         )
     except:
         return Response('Invalid Inventory Info', status.HTTP_406_NOT_ACCEPTABLE)
@@ -290,12 +290,14 @@ def deleteInventoryBySku(request):
     if not res:
         return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
     
-    # calculate time left to delete, prevent delete if result delta seconds is negative
-    # convert form time string to time obj
+    # check if the created time is within 2 days (175000 seconds)
     timeCreated = convertToTime(res['time'])
-    one_day_later = timeCreated + timedelta(days=1)
+    createdTimestamp = datetime.timestamp(timeCreated)
     today = datetime.now()
-    canDel = (one_day_later - today).total_seconds() > 0
+    todayTimestamp = datetime.timestamp(today)
+    
+    two_days = 175000
+    canDel = (todayTimestamp- createdTimestamp) < two_days
     
     # perform deletion or throw error
     if canDel:

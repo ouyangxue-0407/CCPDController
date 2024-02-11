@@ -60,7 +60,7 @@ def getUrlsByOwner(request):
         arr.append(blob_client.url)
 
     if len(arr) < 1:
-        return Response('No Images Found for Owner', status.HTTP_204_NO_CONTENT)
+        return Response('No Images Found for Owner', status.HTTP_200_OK)
     return Response(arr, status.HTTP_200_OK)
 
 # sku: str

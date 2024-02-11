@@ -109,10 +109,16 @@ def login(request):
         'name': user['name']
     }
 
-    # construct response store jwt token in http only cookie
+    # get user agent
     response = Response(info, status.HTTP_200_OK)
+    userAgent = request.META['HTTP_USER_AGENT']
+    
+    # construct response store jwt token in http only cookie
     # cookie wont show unless sets samesite to string "None" and secure to True
-    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
+    if 'Safari' in userAgent or 'iPhone' in userAgent:
+        response.set_cookie('token', token, httponly=True, expires=expire, secure=True)
+    else:
+        response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire)
     return response
 

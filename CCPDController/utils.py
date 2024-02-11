@@ -71,7 +71,13 @@ def getNDayBefore(days_before, time_str) -> str:
 
 # convert from string to iso time
 def convertToTime(time_str):
-    return datetime.strptime(time_str, iso_format)
+    try:
+        return datetime.strptime(time_str, iso_format)
+    except:
+        try:
+            return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
+        except:
+            return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 # inventory time format in eastern timezone
 def getIsoFormatNow():
