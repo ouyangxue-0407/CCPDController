@@ -1,11 +1,8 @@
 import os
 import io
-import random
 import requests
 import pillow_heif
 from PIL import Image
-import datetime
-from datetime import timedelta
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
 from rest_framework import status
@@ -151,3 +148,47 @@ def deleteImageByName(request):
     except:
         return Response('No Such Image', status.HTTP_404_NOT_FOUND)
     return Response('Image Deleted', status.HTTP_200_OK)
+
+# when recording qa inventory records
+# admin upload 1st stock image scraped from amazon or homedepot as {sku}.jpg
+# url: string
+# sku: string
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission | IsAdminPermission])
+def uploadScrapedImage(request):
+    try:
+        body = decodeJSON(request.body)
+        url = body['url']
+        sku = sanitizeString(body['sku'])
+        owner = sanitizeString(body['owner']['id'])
+        ownerName = sanitizeString(body['owner']['name'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    # try request the image
+    try:
+        res = requests.get(url)
+    except:
+        return Response('Cannot GET From Provided URL', status.HTTP_404_NOT_FOUND)
+    if res.status_code != 200:
+        return Response(f'Cannot Get From URL: {res.status_code}')
+    if len(res.content) < 1:
+        return Response(f'Empty Image', status.HTTP_404_NOT_FOUND)
+
+    # construct tags
+    inventory_tags = {
+        "sku": sku, 
+        "time": getBlobTimeString(), # format: 2024-02-06
+        "owner": owner,
+        "ownerName": ownerName
+    }
+    # print(inventory_tags)
+    extension = url.split('.')[-1].split('?')[0]
+    imageName = f'{sku}/{sku}_{sku}.{extension}'
+    # print(imageName)
+    try:
+        res = product_image_container_client.upload_blob(imageName, res.content, tags=inventory_tags)
+    except ResourceExistsError:
+        return Response(imageName + ' Already Exist!', status.HTTP_409_CONFLICT)
+    return Response('found', status.HTTP_200_OK)

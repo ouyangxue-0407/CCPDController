@@ -11,10 +11,11 @@ urlpatterns = [
     path("getInventoryInfoByOwnerId", views.getInventoryInfoByOwnerId, name="getInventoryInfoByOwnerId"),
     path("getInventoryByOwnerName", views.getInventoryByOwnerName, name="getInventoryByOwnerName"),
     path("getQAConditionInfoByOwnerName", views.getQAConditionInfoByOwnerName, name="getQAConditionInfoByOwnerName"),
-    path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
+    path("getAllQAShelfLocations", views.getAllQAShelfLocations, name="getAllQAShelfLocations"),
     # instock inventory
     path("getInstockByPage", views.getInstockByPage, name="getInstockByPage"),
     path("getInstockBySku", views.getInstockBySku, name="getInstockBySku"),
+    path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
     # scraping function
     path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
     path("scrapeInfoBySkuAmazon", views.scrapeInfoBySkuAmazon, name="scrapeInfoBySkuAmazon"),

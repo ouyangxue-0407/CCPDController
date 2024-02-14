@@ -1,8 +1,7 @@
 import os
 import requests
-from time import time, ctime
 from scrapy.http import HtmlResponse
-from datetime import datetime, timedelta
+from datetime import datetime
 from inventoryController.models import InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
@@ -14,7 +13,7 @@ from rest_framework import status
 from fake_useragent import UserAgent
 from bson.objectid import ObjectId
 from collections import Counter
-from CCPDController.chat_gpt_utils import generate_short_product_title, generate_full_product_title
+from CCPDController.chat_gpt_utils import generate_short_product_title
 from inventoryController.unpack_filter import unpackInstockFilter
 import pymongo
 import pandas as pd
@@ -305,13 +304,13 @@ def deleteInventoryBySku(request):
         return Response('Inventory Deleted', status.HTTP_200_OK)
     return Response('Cannot Delete Inventory After 24H, Please Contact Admin', status.HTTP_403_FORBIDDEN)
 
-# get all shelf location for existing inventories
+# get all QA shelf location
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllShelfLocations(request):
+def getAllQAShelfLocations(request):
     try:
-        arr = instock_collection.distinct('shelfLocation')
+        arr = qa_collection.distinct('shelfLocation')
     except:
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
@@ -423,6 +422,17 @@ def updateInstockBySku(request):
     if not res:
         return Response('Update Failed', status.HTTP_404_NOT_FOUND)
     return Response('Update Success', status.HTTP_200_OK)
+
+# get all in-stock shelf location
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllShelfLocations(request):
+    try:
+        arr = instock_collection.distinct('shelfLocation')
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(arr, status.HTTP_200_OK)
 
 
 '''

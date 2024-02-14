@@ -122,7 +122,8 @@ def getImageUrl(response):
         http_pattern = re.compile(r'https?://\S+')
         res = http_pattern.findall(img)
         # return res[:2] # for both lq and hq image
-        return res[1]
+        # slice the last 1 char (/) in string or it will give bad request
+        return res[1][:-1]
 
 # look for US and CA flag
 # <i class="icp-flyout-flag icp-flyout-flag-ca"></i>

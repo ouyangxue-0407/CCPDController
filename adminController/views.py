@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.exceptions import AuthenticationFailed
-from CCPDController.permissions import IsQAPermission, IsAdminPermission
+from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.utils import (
     decodeJSON,
@@ -126,7 +126,7 @@ User manager stuff
 @csrf_protect
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsSuperAdminPermission])
 def createUser(request):
     try:
         body = decodeJSON(request.body)
@@ -154,7 +154,7 @@ def createUser(request):
 # id: string
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsSuperAdminPermission])
 def deleteUserById(request):
     try:
         # convert to BSON
@@ -177,7 +177,7 @@ def deleteUserById(request):
 # body: UserDetail
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsSuperAdminPermission])
 def updateUserById(request, uid):
     try:
         # convert string to ObjectId
@@ -226,7 +226,7 @@ def getAllInvitationCode(request):
 # admin generate invitation code for newly hired QA personal to join
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsSuperAdminPermission])
 def issueInvitationCode(request):
     # generate a uuid for invitation code
     inviteCode = uuid.uuid4()
@@ -244,7 +244,7 @@ def issueInvitationCode(request):
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsAdminPermission])
+@permission_classes([IsSuperAdminPermission])
 def deleteInvitationCode(request):
     try:
         body = decodeJSON(request.body)

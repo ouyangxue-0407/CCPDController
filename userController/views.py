@@ -1,12 +1,21 @@
 import time
 import jwt
 from django.conf import settings
-from django.shortcuts import HttpResponse
-from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.csrf import csrf_protect
 from django.middleware.csrf import get_token
 from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeEmail, sanitizePassword, checkBody, get_client_ip, sanitizeInvitationCode, sanitizeName, user_time_format
+from CCPDController.utils import (
+    decodeJSON, 
+    get_db_client, 
+    sanitizeEmail, 
+    sanitizePassword, 
+    checkBody, 
+    get_client_ip, 
+    sanitizeInvitationCode, 
+    sanitizeName, 
+    user_time_format
+)
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -115,10 +124,7 @@ def login(request):
     
     # construct response store jwt token in http only cookie
     # cookie wont show unless sets samesite to string "None" and secure to True
-    if 'Safari' in userAgent or 'iPhone' in userAgent:
-        response.set_cookie('token', token, httponly=True, expires=expire, secure=True)
-    else:
-        response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
+    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire)
     return response
 
@@ -216,7 +222,7 @@ def registerUser(request):
 # newPassword: xxx
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([IsQAPermission])
+@permission_classes([IsAdminPermission | IsQAPermission])
 def changeOwnPassword(request):
     try:
         # convert to BSON

@@ -11,7 +11,6 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
 # TypeError: Missing required arguments; Expected either ('messages' and 'model') or ('messages', 'model' and 'stream') arguments to be given
-
 # convert QA record comment to inventory comment
 def convertInitials(input_str: str) -> str:
     input_str = input_str.replace("UT.","UNTEST ")

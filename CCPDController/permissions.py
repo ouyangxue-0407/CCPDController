@@ -32,7 +32,7 @@ class IsAdminPermission(permissions.BasePermission):
         elif request.auth == 'Super Admin':
             return True
 
-class IsSuperAdmin(permissions.BasePermission):
+class IsSuperAdminPermission(permissions.BasePermission):
     message = 'Permission Denied, Super Admin Only!'
     def has_permission(self, request, view):
         if request.auth == 'Super Admin':
