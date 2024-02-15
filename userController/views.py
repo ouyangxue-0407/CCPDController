@@ -124,7 +124,8 @@ def login(request):
     
     # construct response store jwt token in http only cookie
     # cookie wont show unless sets samesite to string "None" and secure to True
-    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True) 
+    # response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True)
+    response.set_cookie('token', token, httponly=True, expires=expire, samesite="Lax", secure=True) 
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire)
     return response
 
