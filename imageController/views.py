@@ -138,13 +138,13 @@ def uploadImage(request, ownerId, owner, sku):
 @permission_classes([IsQAPermission | IsAdminPermission])
 def deleteImageByName(request):
     body = decodeJSON(request.body)
-    sku = body['sku']
-    name = body['name']
+    sku = sanitizeNumber(int(body['sku']))
+    name = sanitizeString(body['name'])
     
     # azure automatically unquote all % in url
-    imageName = parse.unquote(sku + '/' + name)
+    imageName = parse.unquote(f'{str(sku)}/{name}')
     try:
-        res = product_image_container_client.delete_blob(imageName)
+        product_image_container_client.delete_blob(imageName)
     except:
         return Response('No Such Image', status.HTTP_404_NOT_FOUND)
     return Response('Image Deleted', status.HTTP_200_OK)
@@ -193,7 +193,12 @@ def uploadScrapedImage(request):
         "ownerName": ownerName
     }
     extension = url.split('.')[-1].split('?')[0]
-    imageName = f'{sku}/{sku}_{sku}.{extension}'
+    
+    # if body have image name set it to that
+    try:
+        imageName = f'{sku}/{sku}_{body['imageName']}.{extension}'
+    except:
+        imageName = f'{sku}/{sku}_{sku}.{extension}'
     try:
         res = product_image_container_client.upload_blob(imageName, compressed_image_stream.getvalue(), tags=inventory_tags)
     except ResourceExistsError:

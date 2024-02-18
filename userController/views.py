@@ -7,7 +7,8 @@ from datetime import date, datetime, timedelta
 from bson.objectid import ObjectId
 from CCPDController.utils import (
     decodeJSON, 
-    get_db_client, 
+    get_db_client,
+    getIsWorkingHourEST, 
     sanitizeEmail, 
     sanitizePassword, 
     checkBody, 
@@ -124,8 +125,8 @@ def login(request):
     
     # construct response store jwt token in http only cookie
     # cookie wont show unless sets samesite to string "None" and secure to True
-    # response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True)
-    response.set_cookie('token', token, httponly=True, expires=expire, samesite="Lax", secure=True) 
+    response.set_cookie('token', token, httponly=True, expires=expire, samesite="None", secure=True)
+    # response.set_cookie('token', token, httponly=True, expires=expire, samesite="Lax", secure=True) 
     response.set_cookie('csrftoken', get_token(request), httponly=True, expires=expire)
     return response
 
@@ -260,3 +261,9 @@ def logout(request):
     except:
         return Response('Token Not Found', status.HTTP_404_NOT_FOUND)
     return response
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission | IsQAPermission])
+def getIsWorkHour(request):
+    return Response(getIsWorkingHourEST(), status.HTTP_200_OK)

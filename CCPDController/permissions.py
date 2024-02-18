@@ -18,6 +18,8 @@ collection = db['User']
 class IsQAPermission(permissions.BasePermission):
     message = 'Permission Denied, QAPersonal Only!'
     def has_permission(self, request, view):
+        # if not in work hours, return false
+        
         # mongo db query
         # grant if user is qa personal and user is active
         if request.auth == 'QAPersonal' and bool(request.user['userActive']) == True:

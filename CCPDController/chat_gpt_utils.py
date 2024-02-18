@@ -9,53 +9,37 @@ model_engine = "gpt-3.5-turbo-instruct"
 # openai.api_key = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-
 # TypeError: Missing required arguments; Expected either ('messages' and 'model') or ('messages', 'model' and 'stream') arguments to be given
-# convert QA record comment to inventory comment
-def convertInitials(input_str: str) -> str:
-    input_str = input_str.replace("UT.","UNTEST ")
-    input_str = input_str.replace("MP.","MISSING PARTS ")
-    input_str = input_str.replace("FT.","FUNCTION TEST ")
-    input_str = input_str.replace("SI.","IMAGE SHOW SIMILAR ITEM ")
-    input_str = input_str.replace("PT.","POWER TEST ")
-    input_str = input_str.replace("API.","ALL PARTS IN ")
-    input_str = input_str.replace("MA.","MISSING ACCESSORIES ")
-    return input_str
-
 # short description (lead on auction flex max 40 char )
-def generate_short_product_title(description):
-    prompt = f"You are an Auctioneer, based on the information, create a short product title. The character limit for product title is 30 byte. {description}."
+def generate_title(title) -> str:
     res = client.chat.completions.create(
-        # model_engine=model_engine,
-        prompt=prompt,
-        max_tokens=40,
-        n=1,
-        stop=None,
-        temperature=0.5,
-        model=model_engine
+        messages=[
+            {
+                "role": "user",
+                "content": f"You are an Auctioneer, based on the information, create a short product title. The character limit for product title is 50 characters. {title}.",
+            }
+        ],
+        model="gpt-3.5-turbo",
+        max_tokens=40
     )
-    title = res.choices[0].text.strip()
-    return title
+    return res.choices[0].message.content.strip()
 
 # full description
-def generate_full_product_title(comment, description):
-    comment = convertInitials(comment)
-    prompt = (
-        f"Additional Condition: {comment}."
-        f"Item information: {description}."
-        f"Please generate a product title in the format [Additional Condition] - [Item information], The character limit for Item information is 150 byte."
-    )
+def generate_description(condition, comment, description) -> str:
     res = client.chat.completions.create(
-        model=model_engine,
-        prompt=prompt,
+        messages=[
+            { "role": "user", "content": f"Item Condition: {condition}, {comment}." },
+            { "role": "user", "content": f"Item information: {description}." },
+            { 
+                "role": "user", 
+                "content": f"Please generate a product description in the format '[Item Condition] - [Item information]', The character limit for Item information is 250 characters." 
+            },
+        ],
+        model="gpt-3.5-turbo",
         max_tokens=100,
-        n=1,
-        stop=None,
-        temperature=0.4,
+        temperature=0.4
     )
-    print(res)
-    Newdescription = res.choices[0].text.strip()
-    return Newdescription
+    return res.choices[0].message.content.strip()
 
 def special_characters_convert_d(description):
         try:

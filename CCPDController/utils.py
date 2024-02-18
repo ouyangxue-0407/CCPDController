@@ -208,3 +208,19 @@ def sanitizeUserInfoBody(body):
             body[attr] = bool(value == 'true')
         else:
             body[attr] = sanitizeString(value)
+            
+# get is current time working hours (EST)
+def getIsWorkingHourEST() -> bool:
+    eastern_timezone = pytz.timezone('America/Toronto')
+    current_time = datetime.now(eastern_timezone)
+    hour = current_time.hour
+    minute = current_time.minute
+    print(hour)
+    print(minute)
+    if hour < 10 and minute < 30:
+        return False
+    elif hour > 19 and minute > 0:
+        return False
+    return True
+    
+    

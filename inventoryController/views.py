@@ -13,7 +13,7 @@ from rest_framework import status
 from fake_useragent import UserAgent
 from bson.objectid import ObjectId
 from collections import Counter
-from CCPDController.chat_gpt_utils import generate_short_product_title
+from CCPDController.chat_gpt_utils import generate_description, generate_title
 from inventoryController.unpack_filter import unpackInstockFilter
 import pymongo
 import pandas as pd
@@ -77,7 +77,6 @@ def getInventoryByOwnerId(request, page):
         inventory['_id'] = str(inventory['_id'])
         arr.append(inventory)
     return Response(arr, status.HTTP_200_OK)
-
 
 # for charts and overview data
 # id: string
@@ -434,32 +433,42 @@ def getAllShelfLocations(request):
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
 
+# converts qa record to inventory
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def createInstockInventory(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+        record = body['record']
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+
+
+    return Response('Inventory Created', status.HTTP_200_OK)
+
 
 '''
 Scraping stuff 
 '''
 # description: string
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def generateDescriptionBySku(request):
     try:
         body = decodeJSON(request.body)
-        sku = sanitizeSku(body['sku'])
+        condition = sanitizeString(body['condition'])
+        comment = sanitizeString(body['comment'])
+        title = sanitizeString(body['title'])
     except:
-        return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
-    
-    print(sku)
-    # grab comment from that specific item
-    comment = qa_collection.find_one({'sku': sku}, {'comment': 1})
-    if not comment:
-        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
     # call chat gpt to generate description
-    lead = generate_short_product_title('USED LIKE NEW - MISISNG 2 ACCESSORIES - Double Canister Dry Food Dispenser Convenient Storage')
-    # full_lead = generate_full_product_title(comment['comment'], '')
-    
-    return Response(lead, status.HTTP_200_OK)
+    lead = generate_title(title)
+    desc = generate_description(condition, comment, title)
+    return Response({ 'lead': lead, 'desc': desc }, status.HTTP_200_OK)
 
 # return info from amazon for given sku
 # sku: string
@@ -644,7 +653,6 @@ def sendQACSV(request):
     # joint file location with relative path
     dirName = os.path.dirname(__file__)
     fileName = os.path.join(dirName, path)
-    print(getIsoFormatNow())
     
     # parse csv to pandas data frame
     data = pd.read_csv(filepath_or_buffer=fileName)
@@ -654,7 +662,7 @@ def sendQACSV(request):
         # time convert to iso format
         # original: 2023-08-03 17:47:00
         # targeted: 2024-01-03T05:00:00.000   optional time zone: -05:00 (EST is -5)
-        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
+        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M %p").isoformat()
         data.loc[index, 'time'] = time
         
         # remove all html tags

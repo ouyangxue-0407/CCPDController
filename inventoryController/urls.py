@@ -16,6 +16,7 @@ urlpatterns = [
     path("getInstockByPage", views.getInstockByPage, name="getInstockByPage"),
     path("getInstockBySku", views.getInstockBySku, name="getInstockBySku"),
     path("getAllShelfLocations", views.getAllShelfLocations, name="getAllShelfLocations"),
+    path("createInstockInventory", views.createInstockInventory, name="createInstockInventory"),
     # scraping function
     path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
     path("scrapeInfoBySkuAmazon", views.scrapeInfoBySkuAmazon, name="scrapeInfoBySkuAmazon"),
