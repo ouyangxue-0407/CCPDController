@@ -1,8 +1,8 @@
 from django.db import models
 
 class InvitationCode(models.Model): 
-    code: models.CharField(max_length=100)
-    exp: models.CharField(max_length=25)
+    code = models.CharField(max_length=100)
+    exp = models.CharField(max_length=25)
     
     # constructor input all info
     def __init__(self, code, exp) -> None:
@@ -31,16 +31,16 @@ class RetailRecord(models.Model):
         ('Store Credit', 'Store Credit'),
     ]
     
-    sku: models.IntegerField(max_length=6)
-    time: models.CharField(max_length=20)
-    amount: models.IntegerField(max_length=7)
-    quantity: models.IntegerField(max_length=4)
-    marketplace: models.CharField(max_length=15, choices=MARKETPLACE_CHOISES)
-    paymentMethod: models.CharField(max_length=15, choices=PAYMENTMETHOD_CHOISES)
-    buyerName: models.CharField(max_length=30)
-    adminName: models.CharField(max_length=30)
-    adminId: models.CharField(max_length=40, blank=True)
-    invoiceNumber: models.CharField(max_length=30, blank=True)
+    sku = models.IntegerField()
+    time = models.CharField(max_length=20)
+    amount = models.IntegerField()
+    quantity = models.IntegerField()
+    marketplace = models.CharField(max_length=15, choices=MARKETPLACE_CHOISES)
+    paymentMethod = models.CharField(max_length=15, choices=PAYMENTMETHOD_CHOISES)
+    buyerName = models.CharField(max_length=30)
+    adminName = models.CharField(max_length=30)
+    adminId = models.CharField(max_length=40, blank=True)
+    invoiceNumber = models.CharField(max_length=30, blank=True)
     
     def __init__(self, sku, time, amount, quantity, marketplace, paymentMethod, buyerName, adminName, adminId) -> None:
         self.sku = sku

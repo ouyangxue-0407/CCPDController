@@ -27,7 +27,6 @@ from CCPDController.utils import (
     user_time_format, 
     sanitizeNumber,
     qa_inventory_db_name,
-    getIsWorkingHourEST
 )
 
 # pymongo
@@ -142,8 +141,6 @@ def createUser(request):
         )
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
-    
-    print(newUser)
     
     try:
         user_collection.insert_one(newUser.__dict__)

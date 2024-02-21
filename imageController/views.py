@@ -195,9 +195,9 @@ def uploadScrapedImage(request):
     extension = url.split('.')[-1].split('?')[0]
     
     # if body have image name set it to that
-    try:
+    if 'imageName' in body:
         imageName = f'{sku}/{sku}_{body['imageName']}.{extension}'
-    except:
+    else:
         imageName = f'{sku}/{sku}_{sku}.{extension}'
     try:
         res = product_image_container_client.upload_blob(imageName, compressed_image_stream.getvalue(), tags=inventory_tags)

@@ -26,6 +26,47 @@ def unpackTimeRange(query_filter, fil):
                 '$gte': f,
                 '$lt': t
             }
+            
+def unpackQAFilter(query_filter, fil, key):
+    # qa personal filter
+    if 'qaFilter' in query_filter and len(query_filter['qaFilter']) > 0:
+        qaf = { '$or': [] }
+        for name in query_filter['qaFilter']:
+            n = sanitizeString(name)
+            qaf['$or'].append({ f'{key}': n })
+        fil['$and'].append(qaf)
+
+def unpackSkuFilter(query_filter, fil):
+    print(query_filter['sku'])
+    if 'sku' in query_filter: 
+        sku = {'sku': {}}
+        if 'gte' in query_filter['sku'] and query_filter['sku']['gte'] != '':
+            sku['sku']['$gte'] = sanitizeNumber(int(query_filter['sku']['gte']))
+        if 'lte' in query_filter['sku'] and query_filter['sku']['lte'] != '':
+            sku['sku']['$lte'] = sanitizeNumber(int(query_filter['sku']['lte']))
+        if sku != {'sku': {}}:
+            fil['$and'].append(sku)
+        
+def unpackPlatformFilter(query_filter, fil):
+    # original platform filter
+    if 'platformFilter' in query_filter and query_filter['platformFilter'] != '':
+        sanitizeString(query_filter['platformFilter'])
+        fil['$and'].append({'platform': query_filter['platformFilter']})
+         
+def unpackMarketPlaceFilter(query_filter, fil): 
+        # marketplace filter
+    if 'marketplaceFilter' in query_filter and query_filter['marketplaceFilter'] != '':
+        sanitizeString(query_filter['marketplaceFilter'])
+        fil['$and'].append({'marketplace': query_filter['marketplaceFilter']})
+        
+def unpackShelfLocation(query_filter, fil):
+    # shelf location Filter
+    if 'shelfLocationFilter' in query_filter and len(query_filter['shelfLocationFilter']) > 0:
+        shf = { '$or': [] }
+        for loc in query_filter['shelfLocationFilter']:
+            l = sanitizeString(loc)
+            shf['$or'].append({ 'shelfLocation': l })
+        fil['$and'].append(shf)
 
 # unpack Q&A Record filter object passed in by frontend
 def unpackQARecordFilter(query_filter, fil):
@@ -38,19 +79,13 @@ def unpackQARecordFilter(query_filter, fil):
         sanitizeString(query_filter['conditionFilter'])
         fil['$and'].append({'itemCondition': query_filter['conditionFilter']})
     
-    # original platform filter
-    if 'platformFilter' in query_filter and query_filter['platformFilter'] != '':
-        sanitizeString(query_filter['platformFilter'])
-        fil['$and'].append({'platform': query_filter['platformFilter']})
-    
-    # marketplace filter
-    if 'marketplaceFilter' in query_filter and query_filter['marketplaceFilter'] != '':
-        sanitizeString(query_filter['marketplaceFilter'])
-        fil['$and'].append({'marketplace': query_filter['marketplaceFilter']})
-    
+    unpackMarketPlaceFilter(query_filter, fil)
+    unpackPlatformFilter(query_filter, fil)
     unpackTimeRange(query_filter, fil)
-
-        
+    unpackSkuFilter(query_filter, fil)
+    unpackShelfLocation(query_filter, fil)
+    unpackQAFilter(query_filter, fil, 'ownerName')
+    
     # remove $and if no filter applied
     if fil['$and'] == []:
         del fil['$and']
@@ -60,7 +95,6 @@ def unpackQARecordFilter(query_filter, fil):
 
 # unpack instock inventory filter object passed in by frontend
 def unpackInstockFilter(query_filter, fil):
-    # mongo_or = { '$or': [] }
     # instock filter
     if 'instockFilter' in query_filter:
         sanitizeString(query_filter['instockFilter'])
@@ -80,27 +114,7 @@ def unpackInstockFilter(query_filter, fil):
     if 'conditionFilter' in query_filter and query_filter['conditionFilter'] != '':
         sanitizeString(query_filter['conditionFilter'])
         fil['$and'].append({'condition': query_filter['conditionFilter']})
-    
-    # original platform filter
-    if 'platformFilter' in query_filter and query_filter['platformFilter'] != '':
-        sanitizeString(query_filter['platformFilter'])
-        fil['$and'].append({'platform': query_filter['platformFilter']})
         
-    
-    # marketplace filter
-    if 'marketplaceFilter' in query_filter and query_filter['marketplaceFilter'] != '':
-        sanitizeString(query_filter['marketplaceFilter'])
-        fil['$and'].append({'marketplace': query_filter['marketplaceFilter']})
-        
-
-    # qa personal filter
-    if 'qaFilter' in query_filter and len(query_filter['qaFilter']) > 0:
-        qaf = { '$or': [] }
-        for name in query_filter['qaFilter']:
-            n = sanitizeString(name)
-            qaf['$or'].append({ 'qaName': n })
-        fil['$and'].append(qaf)
-    
     # admin filter
     if 'adminFilter' in query_filter and len(query_filter['adminFilter']) > 0:
         adf = { '$or': [] }
@@ -108,14 +122,6 @@ def unpackInstockFilter(query_filter, fil):
             n = sanitizeString(name)
             adf['$or'].append({ 'adminName': n })
         fil['$and'].append(adf)
-
-    # shelf location Filter
-    if 'shelfLocationFilter' in query_filter and len(query_filter['shelfLocationFilter']) > 0:
-        shf = { '$or': [] }
-        for loc in query_filter['shelfLocationFilter']:
-            l = sanitizeString(loc)
-            shf['$or'].append({ 'shelfLocation': l })
-        fil['$and'].append(shf)
             
     # keyword filter
     if 'keywordFilter' in query_filter and len(query_filter['keywordFilter']) > 0:
@@ -135,13 +141,16 @@ def unpackInstockFilter(query_filter, fil):
                 fil['msrp']['$gte'] = float(msrpFilter['gte'])
             if msrpFilter['lt'] != '': 
                 fil['msrp']['$lt'] = float(msrpFilter['lt'])
-
+    
+    unpackPlatformFilter(query_filter, fil)
+    unpackMarketPlaceFilter(query_filter, fil)
+    unpackShelfLocation(query_filter, fil)
     unpackTimeRange(query_filter, fil)
+    unpackQAFilter(query_filter, fil, 'qaName')
     
     # remove $and if no filter applied
     # $and cannot be empty
     if fil['$and'] == []:
         del fil['$and']
     
-    pprint(fil)
     return fil

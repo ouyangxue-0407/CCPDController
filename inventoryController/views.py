@@ -1,8 +1,9 @@
 import os
+from sys import platform
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime
-from inventoryController.models import InventoryItem
+from inventoryController.models import InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
@@ -173,26 +174,25 @@ def createInventory(request):
     if inv:
         return Response('SKU Already Existed', status.HTTP_409_CONFLICT)
     
-    # try:
-    print(body['time'])
-    # construct new inventory
-    newInventory = InventoryItem(
-        time = getIsoFormatNow(),
-        sku = sku,
-        itemCondition = body['itemCondition'],
-        comment = body['comment'],
-        link = body['link'],
-        platform = body['platform'],
-        shelfLocation = body['shelfLocation'],
-        amount = body['amount'],
-        owner = body['owner'],
-        ownerName = body['ownerName'],
-        marketplace = body['marketplace']
-    )
-    # pymongo need dict or bson object
-    res = qa_collection.insert_one(newInventory.__dict__)
-    # except:
-    #     return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
+    try:
+        # construct new inventory
+        newInventory = InventoryItem(
+            time = getIsoFormatNow(),
+            sku = sku,
+            itemCondition = body['itemCondition'],
+            comment = body['comment'],
+            link = body['link'],
+            platform = body['platform'],
+            shelfLocation = body['shelfLocation'],
+            amount = body['amount'],
+            owner = body['owner'],
+            ownerName = body['ownerName'],
+            marketplace = body['marketplace']
+        )
+        # pymongo need dict or bson object
+        res = qa_collection.insert_one(newInventory.__dict__)
+    except:
+        return Response('Invalid Inventory Information', status.HTTP_400_BAD_REQUEST)
     return Response('Inventory Created', status.HTTP_200_OK)
 
 # update qa record by sku
@@ -434,17 +434,56 @@ def getAllShelfLocations(request):
     return Response(arr, status.HTTP_200_OK)
 
 # converts qa record to inventory
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def createInstockInventory(request):
-    try:
-        body = decodeJSON(request.body)
-        sku = sanitizeSku(body['sku'])
-        record = body['record']
-    except:
-        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    # try:
+    body = decodeJSON(request.body)
+    sku = sanitizeNumber(body['sku'])
+    res = instock_collection.find_one({'sku': sku})
+    if res:
+        return Response(f'Inventory {sku} Already Instock', status.HTTP_409_CONFLICT)
+    msrp = sanitizeNumber(body['msrp']) if 'msrp' in body else ''
+    shelfLocation = sanitizeString(body['shelfLocation'])
+    condition = sanitizeString(body['condition'])
+    platform = sanitizeString(body['platform'])
+    marketplace = sanitizeString(body['marketplace']) if 'marketplace' in body else 'Hibid'
+    comment = sanitizeString(body['comment'])
+    lead = sanitizeString(body['lead'])
+    description = sanitizeString(body['description'])
+    url = sanitizeString(body['url'])
+    quantityInstock = sanitizeNumber(body['quantityInstock'])
+    quantitySold = sanitizeNumber(body['quantitySold'])
+    adminName = sanitizeString(body['adminName'])
+    qaName = sanitizeString(body['qaName'])
+    time = getIsoFormatNow()
+    print(time)
+    
+    newInv: InstockInventory = InstockInventory(
+        sku=sku,
+        time=time,
+        shelfLocation=shelfLocation,
+        condition=condition,
+        comment=comment,
+        lead=lead,
+        description=description,
+        url=url,
+        marketplace=marketplace,
+        platform=platform,
+        adminName=adminName,
+        qaName=qaName,
+        quantityInstock=quantityInstock,
+        quantitySold=quantitySold,
+        msrp=msrp
+    )
+    # except:
+    #     return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
+    try:
+        instock_collection.insert_one(newInv.__dict__)
+    except:
+        return Response('Cannot Add to Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response('Inventory Created', status.HTTP_200_OK)
 
