@@ -50,7 +50,7 @@ user_time_format = "%b %-d %Y"
 # iso format
 # for QA inventory, table filters,
 iso_format = "%Y-%m-%dT%H:%M:%S.%f"
-
+full_iso_format = "%Y-%m-%dT%H:%M:%S.%fZ"
 # image blob date format
 # 2023-11-30
 # the date have to be 1 digit

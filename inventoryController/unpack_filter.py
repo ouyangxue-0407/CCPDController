@@ -1,34 +1,61 @@
-from CCPDController.utils import sanitizeString, sanitizeNumber
+from CCPDController.utils import sanitizeString, sanitizeNumber, full_iso_format
 from pprint import pprint 
+from datetime import datetime
 
+
+def unpackTimeRange(query_filter, fil):
+    # time range filter
+    if 'timeRangeFilter' in query_filter:
+        timeRange = query_filter['timeRangeFilter']
+        if ('from' in timeRange and timeRange['from'] != '') or ('to' in timeRange and timeRange['to'] != ''):
+            f = sanitizeString(timeRange['from']) if 'from' in timeRange else ''
+
+            # blob_time = datetime.strptime(time_str, blob_date_format)
+            # blob_time = blob_time - timedelta(days=days_before)
+            # return blob_time.strftime(blob_date_format)
+
+            # selected only 1 day so range is from 0000 to 2359 of that day
+            if 'to' not in timeRange and 'from' in timeRange:
+                t = datetime.strptime(f, full_iso_format).replace(hour=23, minute=59, second=59).strftime(full_iso_format)
+            elif 'to' in timeRange and 'from' in timeRange:
+                t = datetime.strptime(sanitizeString(timeRange['to']), full_iso_format).replace(hour=23, minute=59, second=59).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            # else:
+            #     t = sanitizeString(timeRange['to']) if 'to' in timeRange else ''
+            
+            fil['time'] = {
+                '$gte': f,
+                '$lt': t
+            }
 
 # unpack Q&A Record filter object passed in by frontend
 def unpackQARecordFilter(query_filter, fil):
-    # condition filter
-    if query_filter.get('conditionFilter', '') != '':
+    # create $and array
+    if '$and' not in fil:
+        fil['$and'] = []
+        
+    # item condition filter
+    if 'conditionFilter' in query_filter and query_filter['conditionFilter'] != '':
         sanitizeString(query_filter['conditionFilter'])
-        fil['itemCondition'] = query_filter['conditionFilter']
+        fil['$and'].append({'itemCondition': query_filter['conditionFilter']})
     
-    # platform filter
-    if query_filter.get('platformFilter', '') != '':
+    # original platform filter
+    if 'platformFilter' in query_filter and query_filter['platformFilter'] != '':
         sanitizeString(query_filter['platformFilter'])
-        fil['platform'] = query_filter['platformFilter']
+        fil['$and'].append({'platform': query_filter['platformFilter']})
     
     # marketplace filter
-    if query_filter.get('marketplaceFilter', '') != '':
+    if 'marketplaceFilter' in query_filter and query_filter['marketplaceFilter'] != '':
         sanitizeString(query_filter['marketplaceFilter'])
-        fil['marketplace'] = query_filter['marketplaceFilter']
+        fil['$and'].append({'marketplace': query_filter['marketplaceFilter']})
+    
+    unpackTimeRange(query_filter, fil)
+
         
-    # time range filter
-    timeRange = query_filter['timeRangeFilter']
-    if timeRange != {}:
-        sanitizeString(timeRange['from'])
-        sanitizeString(timeRange['to'])
-        fil['time'] = {
-            # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
-            '$gte': timeRange['from'],
-            '$lt': timeRange['to']
-        }
+    # remove $and if no filter applied
+    if fil['$and'] == []:
+        del fil['$and']
+    
+    pprint(fil)
     return fil
 
 # unpack instock inventory filter object passed in by frontend
@@ -108,18 +135,8 @@ def unpackInstockFilter(query_filter, fil):
                 fil['msrp']['$gte'] = float(msrpFilter['gte'])
             if msrpFilter['lt'] != '': 
                 fil['msrp']['$lt'] = float(msrpFilter['lt'])
-            
-    # time range filter
-    if 'timeRangeFilter' in query_filter:
-        timeRange = query_filter['timeRangeFilter']
-        if ('from' in timeRange and timeRange['from'] != '') or ('to' in timeRange and timeRange['to'] != ''):
-            f = sanitizeString(timeRange['from'])
-            t = sanitizeString(timeRange['to'])
-            fil['time'] = {
-                # mongoDB time range query only support ISO 8601 format like '2024-01-03T05:00:00.000Z'
-                '$gte': f,
-                '$lt': t
-            }
+
+    unpackTimeRange(query_filter, fil)
     
     # remove $and if no filter applied
     # $and cannot be empty

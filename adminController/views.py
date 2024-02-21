@@ -290,18 +290,17 @@ QA inventory stuff
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def getQARecordsByPage(request):
-    try:
-        body = decodeJSON(request.body)
-        sanitizeNumber(body['page'])
-        sanitizeNumber(body['itemsPerPage'])
-        query_filter = body['filter']
+    # try:
+    body = decodeJSON(request.body)
+    sanitizeNumber(body['page'])
+    sanitizeNumber(body['itemsPerPage'])
+    query_filter = body['filter']
 
-        # strip the ilter into mongoDB query object in fil
-        fil = {}
-        unpackQARecordFilter(query_filter, fil)
-        print(fil)
-    except:
-        return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
+    # strip the ilter into mongoDB query object in fil
+    fil = {}
+    unpackQARecordFilter(query_filter, fil)
+    # except:
+    #     return Response('Invalid Body: ', status.HTTP_400_BAD_REQUEST)
     
     try:
         arr = []
