@@ -47,6 +47,9 @@ min_role = 4
 # user registration date format
 user_time_format = "%b %-d %Y"
 
+# instock inventory format
+inv_iso_format = '%Y-%m-%d %H:%M:%S'
+
 # iso format
 # for QA inventory, table filters,
 iso_format = "%Y-%m-%dT%H:%M:%S.%f"
@@ -86,6 +89,10 @@ def getIsoFormatNow():
     now = current_time.isoformat()
     return now
 
+def getIsoFormatInv():
+    eastern_timezone = pytz.timezone('America/Toronto')
+    current_time = datetime.now(eastern_timezone)
+    return current_time.strftime(inv_iso_format)
 
 # check if body contains valid user registration information
 def checkBody(body):
@@ -223,4 +230,6 @@ def getIsWorkingHourEST() -> bool:
         return False
     return True
     
-    
+def populateSetData(body, key, setData, sanitizationMethod):
+    if key in body:
+        setData[key] = sanitizationMethod(body[key])

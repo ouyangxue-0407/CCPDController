@@ -1,12 +1,11 @@
 import os
-from sys import platform
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime
 from inventoryController.models import InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
-from CCPDController.permissions import IsQAPermission, IsAdminPermission
+from CCPDController.utils import decodeJSON, get_db_client, getIsoFormatInv, populateSetData, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
+from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
@@ -383,7 +382,7 @@ def getInstockBySku(request):
         return Response('No Instock Record Found', status.HTTP_404_NOT_FOUND)
     return Response(res, status.HTTP_200_OK)
 
-@api_view(['POST'])
+@api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def updateInstockBySku(request):
@@ -393,22 +392,29 @@ def updateInstockBySku(request):
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
-    # check if inventory exists
+    print(sku)
     oldInv = instock_collection.find_one({ 'sku': sku })
     if not oldInv:
-        return Response('Inventory Not Found', status.HTTP_404_NOT_FOUND)
-        
+        return Response('Instock Inventory Not Found', status.HTTP_404_NOT_FOUND)
+    
     # construct $set data according to body
     setData = {}
-    if body['quantityInstock']:
-        setData['quantityInstock'] = sanitizeNumber(body['quantityInstock'])
-    setData['condition'] = sanitizeNumber(body['condition'])
-    setData['platform'] = sanitizeNumber(body['platform'])
-    setData['msrp'] = sanitizeString(body['msrp'])
-    setData['shelfLocation'] = sanitizeString(body['shelfLocation'])
-    setData['comment'] = sanitizeString(body['comment'])
-    setData['description'] = sanitizeString(body['description'])
-    setData['url'] = sanitizeString(body['url'])
+    populateSetData(body, 'sku', setData, sanitizeNumber)
+    populateSetData(body, 'time', setData, sanitizeString)
+    populateSetData(body, 'condition', setData, sanitizeString)
+    populateSetData(body, 'platform', setData, sanitizeString)
+    populateSetData(body, 'marketplace', setData, sanitizeString)
+    populateSetData(body, 'shelfLocation', setData, sanitizeString)
+    populateSetData(body, 'comment', setData, sanitizeString)
+    populateSetData(body, 'url', setData, sanitizeString)
+    populateSetData(body, 'quantityInstock', setData, sanitizeNumber)
+    populateSetData(body, 'quantitySold', setData, sanitizeNumber)
+    populateSetData(body, 'qaName', setData, sanitizeString)
+    populateSetData(body, 'adminName', setData, sanitizeString)
+
+    populateSetData(body, 'msrp', setData, sanitizeNumber)
+    populateSetData(body, 'lead', setData, sanitizeString)
+    populateSetData(body, 'description', setData, sanitizeString)
     
     
     # update inventory
@@ -421,6 +427,26 @@ def updateInstockBySku(request):
     if not res:
         return Response('Update Failed', status.HTTP_404_NOT_FOUND)
     return Response('Update Success', status.HTTP_200_OK)
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsSuperAdminPermission])
+def deleteInstockBySku(request):
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeSku(body['sku'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    oldInv = instock_collection.find_one({ 'sku': sku })
+    if not oldInv:
+        return Response('Instock Inventory Not Found', status.HTTP_404_NOT_FOUND)
+    
+    try:
+        instock_collection.delete_one({ 'sku': sku })
+    except:
+        return Response('Cannot Delete Instock Inventory', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Instock Inventory Deleted', status.HTTP_200_OK)
 
 # get all in-stock shelf location
 @api_view(['GET'])
@@ -438,47 +464,46 @@ def getAllShelfLocations(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def createInstockInventory(request):
-    # try:
-    body = decodeJSON(request.body)
-    sku = sanitizeNumber(body['sku'])
-    res = instock_collection.find_one({'sku': sku})
-    if res:
-        return Response(f'Inventory {sku} Already Instock', status.HTTP_409_CONFLICT)
-    msrp = sanitizeNumber(body['msrp']) if 'msrp' in body else ''
-    shelfLocation = sanitizeString(body['shelfLocation'])
-    condition = sanitizeString(body['condition'])
-    platform = sanitizeString(body['platform'])
-    marketplace = sanitizeString(body['marketplace']) if 'marketplace' in body else 'Hibid'
-    comment = sanitizeString(body['comment'])
-    lead = sanitizeString(body['lead'])
-    description = sanitizeString(body['description'])
-    url = sanitizeString(body['url'])
-    quantityInstock = sanitizeNumber(body['quantityInstock'])
-    quantitySold = sanitizeNumber(body['quantitySold'])
-    adminName = sanitizeString(body['adminName'])
-    qaName = sanitizeString(body['qaName'])
-    time = getIsoFormatNow()
-    print(time)
-    
-    newInv: InstockInventory = InstockInventory(
-        sku=sku,
-        time=time,
-        shelfLocation=shelfLocation,
-        condition=condition,
-        comment=comment,
-        lead=lead,
-        description=description,
-        url=url,
-        marketplace=marketplace,
-        platform=platform,
-        adminName=adminName,
-        qaName=qaName,
-        quantityInstock=quantityInstock,
-        quantitySold=quantitySold,
-        msrp=msrp
-    )
-    # except:
-    #     return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    try:
+        body = decodeJSON(request.body)
+        sku = sanitizeNumber(body['sku'])
+        res = instock_collection.find_one({'sku': sku})
+        if res:
+            return Response(f'Inventory {sku} Already Instock', status.HTTP_409_CONFLICT)
+        msrp = sanitizeNumber(body['msrp']) if 'msrp' in body else ''
+        shelfLocation = sanitizeString(body['shelfLocation'])
+        condition = sanitizeString(body['condition'])
+        platform = sanitizeString(body['platform'])
+        marketplace = sanitizeString(body['marketplace']) if 'marketplace' in body else 'Hibid'
+        comment = sanitizeString(body['comment'])
+        lead = sanitizeString(body['lead'])
+        description = sanitizeString(body['description'])
+        url = sanitizeString(body['url'])
+        quantityInstock = sanitizeNumber(body['quantityInstock'])
+        quantitySold = sanitizeNumber(body['quantitySold'])
+        adminName = sanitizeString(body['adminName'])
+        qaName = sanitizeString(body['qaName'])
+        time = getIsoFormatInv()
+        
+        newInv: InstockInventory = InstockInventory(
+            sku=sku,
+            time=time,
+            shelfLocation=shelfLocation,
+            condition=condition,
+            comment=comment,
+            lead=lead,
+            description=description,
+            url=url,
+            marketplace=marketplace,
+            platform=platform,
+            adminName=adminName,
+            qaName=qaName,
+            quantityInstock=quantityInstock,
+            quantitySold=quantitySold,
+            msrp=msrp
+        )
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
     try:
         instock_collection.insert_one(newInv.__dict__)

@@ -79,8 +79,8 @@ class InstockInventory(models.Model):
     platform = models.CharField(max_length=17, choices=PLATFORM_CHOISES)
     adminName = models.CharField(max_length=40)
     qaName = models.CharField(max_length=40)
-    quantityInstock = models.IntegerField()
-    quantitySold = models.IntegerField()
+    quantityInstock:int = models.IntegerField()
+    quantitySold:int = models.IntegerField()
     msrp = models.FloatField()
 
     def __init__(self, sku, time, shelfLocation, condition, comment, lead, description, url, marketplace, platform, adminName, qaName, quantityInstock, quantitySold, msrp) -> None:
@@ -97,7 +97,7 @@ class InstockInventory(models.Model):
         self.adminName = adminName
         self.qaName = qaName
         self.quantityInstock = quantityInstock
-        self.quantitySold = quantitySold,
+        self.quantitySold = quantitySold
         self.msrp = msrp
         
     # return inventory sku
