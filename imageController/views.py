@@ -46,7 +46,6 @@ def getUrlsByOwner(request):
     # search by owner name
     owner = "\"ownerName\"='" + body['ownerName'] + "'"
     query = owner + " AND " + time
-    print(query)
     
     # collection of blobs
     blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=query)

@@ -61,7 +61,7 @@ def checkAdminToken(request):
     if token:
         user = user_collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1})
         if user:
-            return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name']}, status.HTTP_200_OK)
+            return Response({ 'id': str(ObjectId(user['_id'])), 'name': user['name'], 'role': user['role']}, status.HTTP_200_OK)
     return Response('Token Not Found, Please Login Again', status.HTTP_100_CONTINUE)
 
 # login admins
@@ -89,7 +89,7 @@ def adminLogin(request):
         return Response('Login Failed', status.HTTP_404_NOT_FOUND)
     if bool(user['userActive']) == False:
         return Response('User Inactive', status.HTTP_401_UNAUTHORIZED)
-    if user['role'] != 'Admin':
+    if user['role'] != 'Admin' and user['role'] != 'Super Admin':
         return Response('Permission Denied', status.HTTP_403_FORBIDDEN)
 
     try:
@@ -109,7 +109,8 @@ def adminLogin(request):
     # return the id and name
     info = {
         'id': str(ObjectId(user['_id'])),
-        'name': user['name']
+        'name': user['name'],
+        'role': user['role']
     }
 
     # construct response store jwt token in http only cookie
@@ -266,7 +267,17 @@ def getInstockDistinct(request):
     # try:
     body = decodeJSON(request.body)
     dist = sanitizeString(body['distinct'])
+    # if dist == 'qaName':
+    #     res = instock_collection.distinct(str(dist))
+    #     for item in res:
+    #         users = user_collection.find({'name': item, 'userActive': True}, {'_id': 0,'name': 1})
+    #     arr = []
+    #     for user in users:
+    #         arr.append(user['name'])
+    #     return Response(arr, status.HTTP_200_OK)
+    # else:
     res = instock_collection.distinct(str(dist))
+    
     # except:
     #     return Response('Cannot Pull From Database', status.HTTP_400_BAD_REQUEST)
     return Response(res, status.HTTP_200_OK)

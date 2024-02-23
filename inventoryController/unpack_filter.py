@@ -86,6 +86,15 @@ def unpackQARecordFilter(query_filter, fil):
     unpackShelfLocation(query_filter, fil)
     unpackQAFilter(query_filter, fil, 'ownerName')
     
+    # keyword filter on comment and link
+    if 'keywordFilter' in query_filter and len(query_filter['keywordFilter']) > 0:
+        kwFilter = { '$or': [] }
+        for word in query_filter['keywordFilter']:
+            keyword = sanitizeString(word)
+            kwFilter['$or'].append({ 'comment': {'$regex': keyword} })
+            kwFilter['$or'].append({ 'link': {'$regex': keyword} })
+        fil['$and'].append(kwFilter)
+    
     # remove $and if no filter applied
     if fil['$and'] == []:
         del fil['$and']
@@ -123,7 +132,7 @@ def unpackInstockFilter(query_filter, fil):
             adf['$or'].append({ 'adminName': n })
         fil['$and'].append(adf)
             
-    # keyword filter
+    # keyword filter on lead and description
     if 'keywordFilter' in query_filter and len(query_filter['keywordFilter']) > 0:
         kwFilter = { '$or': [] }
         for word in query_filter['keywordFilter']:

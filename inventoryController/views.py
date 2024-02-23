@@ -536,7 +536,7 @@ def createInstockInventory(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def genCsv():
+def getInstockCsv():
     
     # append this in front of description for item msrp lte 80$
     desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
