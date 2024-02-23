@@ -1,10 +1,24 @@
+from enum import unique
 import os
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime
 from inventoryController.models import InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
-from CCPDController.utils import decodeJSON, get_db_client, getIsoFormatInv, populateSetData, sanitizeNumber, sanitizeSku, convertToTime, getIsoFormatNow, qa_inventory_db_name, getIsoFormatNow, sanitizeString
+from CCPDController.utils import (
+    convertToAmountPerDayData, decodeJSON, 
+    get_db_client, 
+    getIsoFormatInv, 
+    getNDayBeforeToday, 
+    populateSetData, 
+    sanitizeNumber, 
+    sanitizeSku, 
+    convertToTime, 
+    getIsoFormatNow, 
+    qa_inventory_db_name, 
+    getIsoFormatNow, 
+    sanitizeString
+)
 from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -340,29 +354,36 @@ def getInstockByPage(request):
     fil = {}
     fil = unpackInstockFilter(query_filter, fil)
 
-    # try:
-    arr = []
-    skip = body['page'] * body['itemsPerPage']
-    
-    # see if filter is applied to determine the query
-    if fil == {}:
-        query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-        count = instock_collection.count_documents({})
-    else:
-        query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-        count = instock_collection.count_documents(fil)
+    try:
+        arr = []
+        skip = body['page'] * body['itemsPerPage']
+        
+        # see if filter is applied to determine the query
+        if fil == {}:
+            query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = instock_collection.count_documents({})
+        else:
+            query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+            count = instock_collection.count_documents(fil)
 
-    # get rid of object id
-    for inventory in query:
-        inventory['_id'] = str(inventory['_id'])
-        arr.append(inventory)
-            
-    # if pulled array empty return no content
-    if len(arr) == 0:
-        return Response([], status.HTTP_200_OK)
-    # except:
-    #     return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
-    return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
+        # get rid of object id
+        for inventory in query:
+            inventory['_id'] = str(inventory['_id'])
+            arr.append(inventory)
+        
+        # if pulled array empty return no content
+        if len(arr) == 0:
+            return Response([], status.HTTP_200_OK)
+
+        # make chart data
+        res = instock_collection.find({'time': {'$gte': getNDayBeforeToday(10)}}, {'_id': 0})
+        chart_arr = []
+        for item in res:
+            chart_arr.append(item)
+        output = convertToAmountPerDayData(chart_arr)
+    except:
+        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({ "arr": arr, "count": count, "chartData": output }, status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -391,8 +412,7 @@ def updateInstockBySku(request):
         sku = sanitizeSku(body['sku'])
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
-    
-    print(sku)
+
     oldInv = instock_collection.find_one({ 'sku': sku })
     if not oldInv:
         return Response('Instock Inventory Not Found', status.HTTP_404_NOT_FOUND)
@@ -511,6 +531,40 @@ def createInstockInventory(request):
         return Response('Cannot Add to Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response('Inventory Created', status.HTTP_200_OK)
+
+# generate instock inventory csv file competible with hibid
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def genCsv():
+    
+    # append this in front of description for item msrp lte 80$
+    desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
+    vendor_name = 'B0000'
+    msrp = 'MSRP:$'
+    
+    default_start_bid = 5
+    default_start_bid_mystery_box = 5
+    aliexpress_mystery_box_closing = 25
+    
+    reserve_default = 0
+    
+    # Lot	Lead	Description	MSRP:$	Price	Location	item	vendor	start bid	reserve	Est
+    header = [
+        'Lot',
+        'Lead',        # original lead from recording
+        'Description', # original description from recording
+        'MSRP:$',      
+        'Price',       # original scraped msrp  
+        'Location',    # original shelfLocation
+        'item',
+        'vendor',     
+        'start bid',
+        'reserve',
+        'Est'
+    ]
+    
+    return Response('csv', status.HTTP_200_OK)
 
 
 '''
@@ -649,6 +703,9 @@ def scrapePriceBySkuHomeDepot(request):
     return Response(price, status.HTTP_200_OK)
 
 
+'''
+Migration stuff 
+'''
 # for instock record csv processing to mongo db
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])

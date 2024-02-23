@@ -3,6 +3,7 @@ import os
 import json
 import pytz
 from pymongo import MongoClient
+from collections import Counter
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -71,6 +72,10 @@ def getNDayBefore(days_before, time_str) -> str:
     blob_time = datetime.strptime(time_str, blob_date_format)
     blob_time = blob_time - timedelta(days=days_before)
     return blob_time.strftime(blob_date_format)
+
+def getNDayBeforeToday(days_before) -> str:
+    blob_time = datetime.now() - timedelta(days=days_before)
+    return blob_time.strftime(iso_format)
 
 # convert from string to iso time
 def convertToTime(time_str):
@@ -229,7 +234,17 @@ def getIsWorkingHourEST() -> bool:
     elif hour > 19 and minute > 0:
         return False
     return True
-    
+
+# for instock inventory  
 def populateSetData(body, key, setData, sanitizationMethod):
     if key in body:
         setData[key] = sanitizationMethod(body[key])
+        
+def convertToAmountPerDayData(arr):
+    formatted_dates = [datetime.strptime(item['time'], inv_iso_format).strftime('%b %d') for item in arr]
+    date_counts = Counter(formatted_dates)
+    out = []
+    for date, count in date_counts.items():
+        out.append({'date': date, 'Recorded Inventory': count})
+    return out
+    # return [{'date': date, 'Recorded Inventory': count} for date, count in date_counts.items()]
