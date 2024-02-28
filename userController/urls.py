@@ -11,4 +11,5 @@ urlpatterns = [
     path("changeOwnPassword", views.changeOwnPassword, name="changeOwnPassword"),
     path("logout", views.logout, name="logout"),
     path('getIsWorkHour', views.getIsWorkHour, name="getIsWorkHour"),
+    path('getAllActiveQAPersonal', views.getAllActiveQAPersonal, name="getAllActiveQAPersonal"),
 ]

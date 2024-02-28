@@ -10,18 +10,12 @@ def unpackTimeRange(query_filter, fil):
         if ('from' in timeRange and timeRange['from'] != '') or ('to' in timeRange and timeRange['to'] != ''):
             f = sanitizeString(timeRange['from']) if 'from' in timeRange else ''
 
-            # blob_time = datetime.strptime(time_str, blob_date_format)
-            # blob_time = blob_time - timedelta(days=days_before)
-            # return blob_time.strftime(blob_date_format)
-
             # selected only 1 day so range is from 0000 to 2359 of that day
             if 'to' not in timeRange and 'from' in timeRange:
                 t = datetime.strptime(f, full_iso_format).replace(hour=23, minute=59, second=59).strftime(full_iso_format)
             elif 'to' in timeRange and 'from' in timeRange:
                 t = datetime.strptime(sanitizeString(timeRange['to']), full_iso_format).replace(hour=23, minute=59, second=59).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-            # else:
-            #     t = sanitizeString(timeRange['to']) if 'to' in timeRange else ''
-            
+
             fil['time'] = {
                 '$gte': f,
                 '$lt': t

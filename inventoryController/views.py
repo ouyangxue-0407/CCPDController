@@ -1,8 +1,11 @@
+from cgitb import lookup
+from ctypes import Array
 from enum import unique
 import os
+from urllib import response
 import requests
 from scrapy.http import HtmlResponse
-from datetime import datetime
+from datetime import datetime, timedelta
 from inventoryController.models import InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import (
@@ -17,7 +20,8 @@ from CCPDController.utils import (
     getIsoFormatNow, 
     qa_inventory_db_name, 
     getIsoFormatNow, 
-    sanitizeString
+    sanitizeString,
+    full_iso_format
 )
 from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
@@ -326,6 +330,44 @@ def getAllQAShelfLocations(request):
     except:
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(arr, status.HTTP_200_OK)
+
+# get all qa record today plus 7 days prior's record
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getDailyQARecordData(request):
+    # get owners of qa record in 7 days time range
+    time = datetime.now() - timedelta(days=7)
+    owners = qa_collection.find({
+        'time': {
+            '$gte': time.replace(hour=0, minute=0, second=0, microsecond=0).strftime(full_iso_format),
+            '$lt': datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999).strftime(full_iso_format)        
+        }
+    }).distinct('ownerName')
+
+    # for all owner get past 7days qa record count array
+    res = []
+    dates = []
+    for owner in owners:
+        # skip if not active
+        if not user_collection.find_one({'name': owner, 'userActive': True}):
+            continue
+        # get 7 days count
+        counts = []
+        days = 7
+        for x in range(days):
+            time = datetime.now() - timedelta(days=x)
+            counts.append(qa_collection.count_documents({
+                'time': {
+                    '$gte': time.replace(hour=0, minute=0, second=0, microsecond=0).strftime(full_iso_format),
+                    '$lt': time.replace(hour=23, minute=59, second=59, microsecond=999999).strftime(full_iso_format)        
+                }, 
+                'ownerName': owner
+            }))
+            if len(dates) < days:
+                dates.append(f'{time.month}/{time.day}')
+        res.append({owner: counts})
+    return Response({'res': res, 'dates': dates})
 
 
 '''

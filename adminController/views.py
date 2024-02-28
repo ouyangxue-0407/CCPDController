@@ -488,3 +488,14 @@ def getSalesRecordsBySku(request, sku):
 @permission_classes([IsAdminPermission])
 def createReturnRecord(request):
     return Response('Return Record')
+
+
+'''
+CSV stuff
+'''
+
+# returns (sku, amount, shelfLocation, name)
+
+def getShelfSkuCSV(request):
+    
+    return Response('csv', status.HTTP_200_OK)

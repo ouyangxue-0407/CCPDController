@@ -12,6 +12,7 @@ urlpatterns = [
     path("getInventoryByOwnerName", views.getInventoryByOwnerName, name="getInventoryByOwnerName"),
     path("getQAConditionInfoByOwnerName", views.getQAConditionInfoByOwnerName, name="getQAConditionInfoByOwnerName"),
     path("getAllQAShelfLocations", views.getAllQAShelfLocations, name="getAllQAShelfLocations"),
+    path("getDailyQARecordData", views.getDailyQARecordData, name="getDailyQARecordData"),
     # instock inventory
     path("getInstockByPage", views.getInstockByPage, name="getInstockByPage"),
     path("getInstockBySku", views.getInstockBySku, name="getInstockBySku"),

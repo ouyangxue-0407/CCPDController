@@ -247,4 +247,3 @@ def convertToAmountPerDayData(arr):
     for date, count in date_counts.items():
         out.append({'date': date, 'Recorded Inventory': count})
     return out
-    # return [{'date': date, 'Recorded Inventory': count} for date, count in date_counts.items()]

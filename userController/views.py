@@ -28,7 +28,7 @@ from userController.models import User
 
 # pymongo
 db = get_db_client()
-collection = db['User']
+user_collection = db['User']
 inv_collection = db['Invitations']
 
 # jwt token expiring time
@@ -62,7 +62,7 @@ def checkToken(request):
         raise AuthenticationFailed('No Token')
 
     # check user status
-    user = collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1, 'userActive': 1})
+    user = user_collection.find_one({'_id': ObjectId(payload['id'])}, {'name': 1, 'role': 1, 'userActive': 1})
     if not user:
         raise AuthenticationFailed('User Not Found')
     if user['userActive'] == False:
@@ -88,7 +88,7 @@ def login(request):
 
     # check if user exist
     # only retrive user status and role
-    user = collection.find_one({
+    user = user_collection.find_one({
         'email': email,
         'password': password
     }, { 'userActive': 1, 'role': 1, 'name': 1 })
@@ -144,7 +144,7 @@ def getUserById(request):
         return Response('Invalid User ID', status.HTTP_401_UNAUTHORIZED)
     
     # query db for user
-    res = collection.find_one(
+    res = user_collection.find_one(
         { '_id': uid }, 
         { 'name': 1, 'email': 1, 'role': 1, 'registrationDate': 1, 'userActive': 1 }
     )
@@ -181,7 +181,7 @@ def registerUser(request):
         invCode = sanitizeInvitationCode(body['code'])
 
         # check if email exist in database
-        res = collection.find_one({ 'email': body['email'] })
+        res = user_collection.find_one({ 'email': body['email'] })
         if res:
             return Response('Email already existed!', status.HTTP_409_CONFLICT)
         if email == False or password == False or invCode == False:
@@ -212,7 +212,7 @@ def registerUser(request):
     )
     
     # insert user into db
-    res = collection.insert_one(newUser.__dict__)
+    res = user_collection.insert_one(newUser.__dict__)
 
     if res:
         inv_collection.delete_one({'code': invCode})
@@ -235,7 +235,7 @@ def changeOwnPassword(request):
         return Response('User ID or Password Invalid:', status.HTTP_401_UNAUTHORIZED)
     
     # query for uid and role to be QA personal and update
-    res = collection.update_one(
+    res = user_collection.update_one(
         {
             '_id': uid,
             'role': 'QAPersonal'
@@ -267,3 +267,14 @@ def logout(request):
 @permission_classes([IsAdminPermission | IsQAPermission])
 def getIsWorkHour(request):
     return Response(getIsWorkingHourEST(), status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllActiveQAPersonal(request):
+    res = user_collection.find({'role': 'QAPersonal', 'userActive': True}, {'_id':0, 'name': 1})
+    arr = []
+    for u in res:
+        arr.append(u['name'])
+    return Response(arr, status.HTTP_200_OK)
