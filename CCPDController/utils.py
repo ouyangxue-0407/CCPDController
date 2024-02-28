@@ -239,7 +239,7 @@ def getIsWorkingHourEST() -> bool:
 def populateSetData(body, key, setData, sanitizationMethod):
     if key in body:
         setData[key] = sanitizationMethod(body[key])
-        
+
 def convertToAmountPerDayData(arr):
     formatted_dates = [datetime.strptime(item['time'], inv_iso_format).strftime('%b %d') for item in arr]
     date_counts = Counter(formatted_dates)
@@ -247,3 +247,10 @@ def convertToAmountPerDayData(arr):
     for date, count in date_counts.items():
         out.append({'date': date, 'Recorded Inventory': count})
     return out
+
+def getTodayTimeRangeFil(deltaDays=0):
+    time = datetime.now() - timedelta(days=deltaDays)
+    return {
+        '$gte': time.replace(hour=0, minute=0, second=0, microsecond=0).strftime(full_iso_format),
+        '$lt': time.replace(hour=23, minute=59, second=59, microsecond=999999).strftime(full_iso_format)
+    }

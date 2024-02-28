@@ -102,7 +102,10 @@ def uploadImage(request, ownerId, owner, sku):
         "owner": ownerId,
         "ownerName": owner
     }
-    
+    print(len(request.FILES))
+    if len(request.FILES) < 1:
+        return Response('No images to upload', status.HTTP_200_OK)
+    res = {}
     # loop the files in the request
     for name, value in request.FILES.items():
         # images will be uploaded to the folder named after their sku
@@ -125,12 +128,13 @@ def uploadImage(request, ownerId, owner, sku):
             # change extension to jpg
             base_name = os.path.splitext(name)[0]
             imageName = sku + '/' + base_name + '.' + 'jpg'
-        
         try:
             res = product_image_container_client.upload_blob(imageName, img, tags=inventory_tags)
+            if not res: 
+                return Response('Failed to upload', status.HTTP_500_INTERNAL_SERVER_ERROR)
         except ResourceExistsError:
             return Response(imageName + 'Already Exist!', status.HTTP_409_CONFLICT)
-    return Response(res.url, status.HTTP_200_OK)
+    return Response('Upload success', status.HTTP_200_OK)
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])

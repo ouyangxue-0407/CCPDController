@@ -12,7 +12,7 @@ from CCPDController.utils import (
     convertToAmountPerDayData, decodeJSON, 
     get_db_client, 
     getIsoFormatInv, 
-    getNDayBeforeToday, 
+    getNDayBeforeToday, getTodayTimeRangeFil, 
     populateSetData, 
     sanitizeNumber, 
     sanitizeSku, 
@@ -356,12 +356,8 @@ def getDailyQARecordData(request):
         counts = []
         days = 7
         for x in range(days):
-            time = datetime.now() - timedelta(days=x)
             counts.append(qa_collection.count_documents({
-                'time': {
-                    '$gte': time.replace(hour=0, minute=0, second=0, microsecond=0).strftime(full_iso_format),
-                    '$lt': time.replace(hour=23, minute=59, second=59, microsecond=999999).strftime(full_iso_format)        
-                }, 
+                'time': getTodayTimeRangeFil(x), 
                 'ownerName': owner
             }))
             if len(dates) < days:
@@ -369,6 +365,41 @@ def getDailyQARecordData(request):
         res.append({owner: counts})
     return Response({'res': res, 'dates': dates})
 
+# get todays shelf location sheet by user name
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsQAPermission])
+def getShelfSheetByUser(request):
+    try:
+        body = decodeJSON(request.body)
+        owner = body['ownerName']
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    # get from db
+    res = qa_collection.find({'ownerName': owner, 'time': getTodayTimeRangeFil()}, {'_id': 0, 'sku': 1, 'shelfLocation': 1, 'amount': 1, 'ownerName': 1, 'time': 1})
+    if not res:
+        return Response('No Record Found', status.HTTP_200_OK)
+    arr = []
+    for item in res:
+        arr.append(item)
+    return Response(arr, status.HTTP_200_OK)
+
+# get todays shelf location sheet
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAllShelfSheet(request):
+    
+    con = {'time': getTodayTimeRangeFil()}
+    res = qa_collection.find(con, {'_id': 0, 'sku': 1, 'shelfLocation': 1, 'amount': 1, 'ownerName': 1, 'time': 1})
+    
+    if not res:
+        return Response('No Record Found', status.HTTP_200_OK)
+    arr = []
+    for item in res:
+        arr.append(item)
+    return Response({'data': arr, 'count': qa_collection.count_documents(con)}, status.HTTP_200_OK)
 
 '''
 In-stock stuff

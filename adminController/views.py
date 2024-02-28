@@ -493,9 +493,7 @@ def createReturnRecord(request):
 '''
 CSV stuff
 '''
-
 # returns (sku, amount, shelfLocation, name)
-
 def getShelfSkuCSV(request):
     
     return Response('csv', status.HTTP_200_OK)
