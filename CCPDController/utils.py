@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import json
+from uu import Error
 import pytz
 from pymongo import MongoClient
 from collections import Counter
@@ -241,8 +242,13 @@ def populateSetData(body, key, setData, sanitizationMethod):
         setData[key] = sanitizationMethod(body[key])
 
 def convertToAmountPerDayData(arr):
+    # try:
     formatted_dates = [datetime.strptime(item['time'], inv_iso_format).strftime('%b %d') for item in arr]
     date_counts = Counter(formatted_dates)
+    # except:
+    #     formatted_dates = [datetime.strptime(item['time'], '%Y-%m-%d %H:%M:%S').strftime('%b %d') for item in arr]
+    #     date_counts = Counter(formatted_dates)
+    
     out = []
     for date, count in date_counts.items():
         out.append({'date': date, 'Recorded Inventory': count})

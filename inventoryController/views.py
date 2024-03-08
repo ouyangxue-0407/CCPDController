@@ -1,8 +1,8 @@
-from cgitb import lookup
-from ctypes import Array
-from enum import unique
 import os
 from urllib import response
+from uu import decode
+from django.http import HttpRequest, HttpResponse
+from numpy import NaN
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
@@ -21,12 +21,14 @@ from CCPDController.utils import (
     qa_inventory_db_name, 
     getIsoFormatNow, 
     sanitizeString,
-    full_iso_format
+    full_iso_format,
+    inv_iso_format
 )
 from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
+from rest_framework.request import Request
 from rest_framework import status
 from fake_useragent import UserAgent
 from bson.objectid import ObjectId
@@ -36,6 +38,7 @@ from inventoryController.unpack_filter import unpackInstockFilter
 import pymongo
 import pandas as pd
 from bs4 import BeautifulSoup
+from io import TextIOWrapper
 
 # pymongo
 db = get_db_client()
@@ -53,7 +56,7 @@ QA Inventory stuff
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getInventoryBySku(request):
+def getInventoryBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeNumber(int(body['sku']))
@@ -76,7 +79,7 @@ def getInventoryBySku(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getInventoryByOwnerId(request, page):
+def getInventoryByOwnerId(request: HttpRequest, page):
     try:
         body = decodeJSON(request.body)
         ownerId = str(ObjectId(body['id']))
@@ -101,7 +104,7 @@ def getInventoryByOwnerId(request, page):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getInventoryInfoByOwnerId(request):
+def getInventoryInfoByOwnerId(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         ownerId = str(ObjectId(body['id']))
@@ -126,7 +129,7 @@ def getInventoryInfoByOwnerId(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getInventoryByOwnerName(request):
+def getInventoryByOwnerName(request: HttpRequest):
     # try:
     body = decodeJSON(request.body)
     name = sanitizeString(body['ownerName'])
@@ -153,7 +156,7 @@ def getInventoryByOwnerName(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def getQAConditionInfoByOwnerName(request):
+def getQAConditionInfoByOwnerName(request: HttpRequest):
     # try:
     body = decodeJSON(request.body)
     name = sanitizeString(body['ownerName'])
@@ -179,7 +182,7 @@ def getQAConditionInfoByOwnerName(request):
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def createInventory(request):
+def createInventory(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -232,7 +235,7 @@ def createInventory(request):
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission | IsAdminPermission])
-def updateInventoryBySku(request, sku):
+def updateInventoryBySku(request: HttpRequest, sku: str):
     try:
         # convert to object id
         body = decodeJSON(request.body)
@@ -269,6 +272,7 @@ def updateInventoryBySku(request, sku):
         {
             '$set': 
             {
+                'sku': newInventory.sku,
                 'amount': newInventory.amount,
                 'itemCondition': newInventory.itemCondition,
                 'platform': newInventory.platform,
@@ -291,7 +295,7 @@ def updateInventoryBySku(request, sku):
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
-def deleteInventoryBySku(request):
+def deleteInventoryBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -308,11 +312,16 @@ def deleteInventoryBySku(request):
     # check if the created time is within 2 days (175000 seconds)
     timeCreated = convertToTime(res['time'])
     createdTimestamp = datetime.timestamp(timeCreated)
-    today = datetime.now()
-    todayTimestamp = datetime.timestamp(today)
+    todayTimestamp = datetime.timestamp(datetime.now())
     
     two_days = 175000
     canDel = (todayTimestamp- createdTimestamp) < two_days
+    print(todayTimestamp)
+    print(createdTimestamp)
+    print(todayTimestamp - createdTimestamp)
+    print(two_days)
+    print(canDel)
+    
     
     # perform deletion or throw error
     if canDel:
@@ -324,7 +333,7 @@ def deleteInventoryBySku(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllQAShelfLocations(request):
+def getAllQAShelfLocations(request: HttpRequest):
     try:
         arr = qa_collection.distinct('shelfLocation')
     except:
@@ -335,7 +344,7 @@ def getAllQAShelfLocations(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getDailyQARecordData(request):
+def getDailyQARecordData(request: HttpRequest):
     # get owners of qa record in 7 days time range
     time = datetime.now() - timedelta(days=7)
     owners = qa_collection.find({
@@ -360,8 +369,9 @@ def getDailyQARecordData(request):
                 'time': getTodayTimeRangeFil(x), 
                 'ownerName': owner
             }))
+            times = datetime.now() - timedelta(days=x)
             if len(dates) < days:
-                dates.append(f'{time.month}/{time.day}')
+                dates.append(f'{times.month}/{times.day}')
         res.append({owner: counts})
     return Response({'res': res, 'dates': dates})
 
@@ -369,7 +379,7 @@ def getDailyQARecordData(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsQAPermission])
-def getShelfSheetByUser(request):
+def getShelfSheetByUser(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         owner = body['ownerName']
@@ -385,21 +395,31 @@ def getShelfSheetByUser(request):
         arr.append(item)
     return Response(arr, status.HTTP_200_OK)
 
-# get todays shelf location sheet
-@api_view(['POST'])
+# get end of the day shelf location sheet for all records submitted today
+@api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllShelfSheet(request):
-    
-    con = {'time': getTodayTimeRangeFil()}
-    res = qa_collection.find(con, {'_id': 0, 'sku': 1, 'shelfLocation': 1, 'amount': 1, 'ownerName': 1, 'time': 1})
-    
+def getAllShelfSheet(request: HttpRequest):
+    con = { 'time': getTodayTimeRangeFil() }
+    res = qa_collection.find(con, {'_id': 0, 'sku': 1, 'shelfLocation': 1, 'amount': 1, 'ownerName': 1, 'time': 1}).sort('shelfLocation', pymongo.ASCENDING)
     if not res:
-        return Response('No Record Found', status.HTTP_200_OK)
+        return Response('No Record Found', status.HTTP_204_NO_CONTENT)
+
     arr = []
     for item in res:
         arr.append(item)
-    return Response({'data': arr, 'count': qa_collection.count_documents(con)}, status.HTTP_200_OK)
+    if len(arr) < 1:
+        return Response('No Records Found', status.HTTP_204_NO_CONTENT)
+    
+    # mongo data array to pandas dataframe
+    resData = pd.DataFrame(
+        arr,
+        columns=['sku', 'shelfLocation', 'amount', 'ownerName', 'time'],
+    )
+    csv = resData.to_csv(index=False)
+    response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
+    return response
 
 '''
 In-stock stuff
@@ -418,7 +438,7 @@ In-stock stuff
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getInstockByPage(request):
+def getInstockByPage(request: HttpRequest):
     body = decodeJSON(request.body)
     sanitizeNumber(body['page'])
     sanitizeNumber(body['itemsPerPage'])
@@ -427,41 +447,41 @@ def getInstockByPage(request):
     fil = {}
     fil = unpackInstockFilter(query_filter, fil)
 
-    try:
-        arr = []
-        skip = body['page'] * body['itemsPerPage']
-        
-        # see if filter is applied to determine the query
-        if fil == {}:
-            query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = instock_collection.count_documents({})
-        else:
-            query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
-            count = instock_collection.count_documents(fil)
+    # try:
+    arr = []
+    skip = body['page'] * body['itemsPerPage']
+    
+    # see if filter is applied to determine the query
+    if fil == {}:
+        query = instock_collection.find().sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        count = instock_collection.count_documents({})
+    else:
+        query = instock_collection.find(fil).sort('sku', pymongo.DESCENDING).skip(skip).limit(body['itemsPerPage'])
+        count = instock_collection.count_documents(fil)
 
-        # get rid of object id
-        for inventory in query:
-            inventory['_id'] = str(inventory['_id'])
-            arr.append(inventory)
-        
-        # if pulled array empty return no content
-        if len(arr) == 0:
-            return Response([], status.HTTP_200_OK)
+    # get rid of object id
+    for inventory in query:
+        inventory['_id'] = str(inventory['_id'])
+        arr.append(inventory)
+    
+    # if pulled array empty return no content
+    if len(arr) == 0:
+        return Response([], status.HTTP_200_OK)
 
-        # make chart data
-        res = instock_collection.find({'time': {'$gte': getNDayBeforeToday(10)}}, {'_id': 0})
-        chart_arr = []
-        for item in res:
-            chart_arr.append(item)
-        output = convertToAmountPerDayData(chart_arr)
-    except:
-        return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # make and return chart data
+    res = instock_collection.find({'time': {'$gte': getNDayBeforeToday(10)}}, {'_id': 0})
+    chart_arr = []
+    for item in res:
+        chart_arr.append(item)
+    output = convertToAmountPerDayData(chart_arr)
+    # except:
+    #     return Response(chart_arr, status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({ "arr": arr, "count": count, "chartData": output }, status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getInstockBySku(request):
+def getInstockBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -479,7 +499,7 @@ def getInstockBySku(request):
 @api_view(['PUT'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def updateInstockBySku(request):
+def updateInstockBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -524,7 +544,7 @@ def updateInstockBySku(request):
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsSuperAdminPermission])
-def deleteInstockBySku(request):
+def deleteInstockBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeSku(body['sku'])
@@ -545,7 +565,7 @@ def deleteInstockBySku(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getAllShelfLocations(request):
+def getAllShelfLocations(request: HttpRequest):
     try:
         arr = instock_collection.distinct('shelfLocation')
     except:
@@ -556,7 +576,7 @@ def getAllShelfLocations(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def createInstockInventory(request):
+def createInstockInventory(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeNumber(body['sku'])
@@ -603,27 +623,43 @@ def createInstockInventory(request):
     except:
         return Response('Cannot Add to Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    try:
+        qa_collection.update_one(
+            {'sku': sku, 'ownerName': qaName}, 
+            {'$set': { 'recorded': True }}
+        )
+    except:
+        return Response('Cannot Set QA Record Stats', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     return Response('Inventory Created', status.HTTP_200_OK)
 
 # generate instock inventory csv file competible with hibid
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getInstockCsv():
-    
+def getInstockCsv(request: HttpRequest):
+    body = decodeJSON(request.body)
+
     # append this in front of description for item msrp lte 80$
     desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
     vendor_name = 'B0000'
-    msrp = 'MSRP:$'
-    
     default_start_bid = 5
     default_start_bid_mystery_box = 5
     aliexpress_mystery_box_closing = 25
-    
     reserve_default = 0
     
-    # Lot	Lead	Description	MSRP:$	Price	Location	item	vendor	start bid	reserve	Est
-    header = [
+    # for images data frame
+    maxImageCount = 15
+    ImageDataExample = [
+        ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
+        ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
+    ]
+    
+    max_length = max(len(row) for row in ImageDataExample)
+    normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
+    image_df = pd.DataFrame(normalized_data)
+
+    col = [
         'Lot',
         'Lead',        # original lead from recording
         'Description', # original description from recording
@@ -634,10 +670,83 @@ def getInstockCsv():
         'vendor',     
         'start bid',
         'reserve',
-        'Est'
+        'Est',
     ]
     
-    return Response('csv', status.HTTP_200_OK)
+    example = {
+        'Lot': 706, 
+        'Lead': 'xxx',
+        'Description': 'xxxx',
+        'MSRP:$': 'MSRP:$',
+        'Price': 'NA',
+        'Location': 'D11',
+        'item': '99999',
+        'vendor': vendor_name,
+        'start bid': 5,
+        'reserve': 0,
+        'Est': 0,
+    }
+    example2 = {
+        'Lot': 707, 
+        'Lead': 'xxx',
+        'Description': 'xxxx',
+        'MSRP:$': 'MSRP:$',
+        'Price': 'NA',
+        'Location': 'D11',
+        'item': '99998',
+        'vendor': vendor_name,
+        'start bid': 5,
+        'reserve': 0,
+        'Est': 0,
+    }
+    data = [example, example2]
+    df = pd.DataFrame(
+        data=data,
+        columns=col
+    )
+    res = df.join(image_df, how='outer')
+    csv = res.to_csv(index=False)
+    response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
+    return response
+
+
+'''
+Auction Stuff
+'''
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def createAuctionRecord(request: HttpRequest):
+    body = decodeJSON(request.body)
+
+    
+
+    return Response('suc', status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def createAuctionRecord(request: HttpRequest):
+    body = decodeJSON(request.body)
+    
+    return Response('', status.HTTP_200_OK)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def processRemaining(request: HttpRequest):
+    body = decodeJSON(request.body)
+    # if 'file' in request.FILES:
+    #     csv_file = TextIOWrapper(request.FILES['file'].file, encoding='utf-8')
+    #     csv_reader = csv.reader(csv_file)
+    #     for row in csv_reader:
+    #         # Process each row here
+    #         print(row)
+    #     return Response({'message': 'CSV file processed successfully'})
+    # return Response({'error': 'No file was uploaded'}, status=400)
+    # return Response('', status.HTTP_200_OK)
 
 
 '''
@@ -647,7 +756,7 @@ Scraping stuff
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def generateDescriptionBySku(request):
+def generateDescriptionBySku(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         condition = sanitizeString(body['condition'])
@@ -666,7 +775,7 @@ def generateDescriptionBySku(request):
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def scrapeInfoBySkuAmazon(request):
+def scrapeInfoBySkuAmazon(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeNumber(int(body['sku']))
@@ -728,7 +837,7 @@ def scrapeInfoBySkuAmazon(request):
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def scrapePriceBySkuHomeDepot(request):
+def scrapePriceBySkuHomeDepot(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
         sku = sanitizeNumber(int(body['sku']))
@@ -783,7 +892,7 @@ Migration stuff
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def sendInstockCSV(request):
+def sendInstockCSV(request: HttpRequest):
     body = decodeJSON(request.body)
     path = body['path']
 
@@ -798,7 +907,7 @@ def sendInstockCSV(request):
     # loop pandas dataframe
     for index in data.index:
         # if time is malformed set to empty string
-        if len(str(data['time'][index])) < 19 or '0000-00-00 00:00:00':
+        if len(str(data['time'][index])) < 18 or '0000-00-00 00:00:00' in str(data['time'][index]):
             data.loc[index, 'time'] = ''
         else:
             # time convert to iso format
@@ -825,22 +934,26 @@ def sendInstockCSV(request):
             data.loc[index, 'condition'] = condition
             
         # remove $ inside msrp price
-        if 'NA' in str(data['msrp'][index]) or '***Need Price***' in str(data['msrp'][index]):
+        try:
+            if 'NA' in str(data['msrp'][index]) or '***Need Price***' in str(data['msrp'][index]):
+                data.loc[index, 'msrp'] = ''
+            else:
+                msrp = str(data['msrp'][index]).replace('$', '')
+                msrp = msrp.replace(',', '')
+                data.loc[index, 'msrp'] = float(msrp)
+        except:
             data.loc[index, 'msrp'] = ''
-        else:
-            msrp = str(data['msrp'][index]).replace('$', '')
-            msrp = msrp.replace(',', '')
-            data.loc[index, 'msrp'] = float(msrp)
 
     # set output copy path
     data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
     return Response(str(data), status.HTTP_200_OK)
 
 # for qa record csv processing to mongo db
+# detects and removes existing sku in QARecords
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def sendQACSV(request):
+def sendQACSV(request: HttpRequest):
     body = decodeJSON(request.body)
     path = body['path']
 
@@ -851,12 +964,22 @@ def sendQACSV(request):
     # parse csv to pandas data frame
     data = pd.read_csv(filepath_or_buffer=fileName)
     
+    existedSKU = []
+    
     # loop pandas dataframe
     for index in data.index:
+        res = qa_collection.find_one({'sku': int(data['sku'][index])})
+        if res:
+            existedSKU.append(data['sku'][index])
+            continue
+        
         # time convert to iso format
-        # original: 2023-08-03 17:47:00
+        # original: 2023-08-03 17:47:00 OR 02/20/2024 11:42am
         # targeted: 2024-01-03T05:00:00.000   optional time zone: -05:00 (EST is -5)
-        time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M %p").isoformat()
+        try:
+            time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M %p").isoformat()
+        except:
+            time = datetime.strptime(data['time'][index], "%m/%d/%Y %I:%M%p").isoformat()
         data.loc[index, 'time'] = time
         
         # remove all html tags
@@ -873,30 +996,47 @@ def sendQACSV(request):
         if data['platform'][index] == 'other':
             data.loc[index, 'platform'] = 'Other'
 
+    # drop existed sku
+    # data.drop(index=existedSKU, inplace=True)
+    filtered_df = data[~data['sku'].isin(existedSKU)]
+
     # set output copy path
-    data.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
+    filtered_df.to_csv(path_or_buf='./output.csv', encoding='utf-8', index=False)
     return Response(str(data), status.HTTP_200_OK)
 
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def fillPlatform(request):
+def fillPlatform(request: HttpRequest):
     # find
-    myquery = {
-       '$nor': [
-           {'url': {"$regex": "ebay"}}, 
-           {'url': {"$regex": "homedepot"}}, 
-           {'url': {"$regex": "amazon"}}, 
-           {'url': {"$regex": "a.co"}}, 
-           {'url': {"$regex": "amzn"}}, 
-           {'url': {"$regex": "ebay"}}, 
-           {'url': {"$regex": "aliexpress"}},
-           {'url': {"$regex": "walmart"}}
-        ], 
-    }
+    # myquery = {
+    #    '$nor': [
+    #        {'url': {"$regex": "ebay"}}, 
+    #        {'url': {"$regex": "homedepot"}}, 
+    #        {'url': {"$regex": "amazon"}}, 
+    #        {'url': {"$regex": "a.co"}}, 
+    #        {'url': {"$regex": "amzn"}}, 
+    #        {'url': {"$regex": "ebay"}}, 
+    #        {'url': {"$regex": "aliexpress"}},
+    #        {'url': {"$regex": "walmart"}}
+    #     ], 
+    # }
 
-    # set
-    newvalues = { "$set": { "platform": "Other" }}
-    res = instock_collection.update_many(myquery, newvalues)
+    # # set
+    # newvalues = { "$set": { "platform": "Other" }}
+    # res = instock_collection.update_many(myquery, newvalues)
+    
+    res = instock_collection.find({'time': {'$regex': 'T'}})
+
+    for item in res:
+        time = item['time'].replace('T', ' ')
+        res = instock_collection.update_one(
+            {'sku': item['sku'], 'time': item['time']},
+            {
+                '$set': { 'time': time }
+            }
+        )
+        if res:
+            print(time)
     return Response('Platform Filled', status.HTTP_200_OK)

@@ -31,7 +31,6 @@ def unpackQAFilter(query_filter, fil, key):
         fil['$and'].append(qaf)
 
 def unpackSkuFilter(query_filter, fil):
-    print(query_filter['sku'])
     if 'sku' in query_filter: 
         sku = {'sku': {}}
         if 'gte' in query_filter['sku'] and query_filter['sku']['gte'] != '':
@@ -112,12 +111,15 @@ def unpackInstockFilter(query_filter, fil):
     # create $and array
     if '$and' not in fil:
         fil['$and'] = []
-
+    
+    # sku filter
+    unpackSkuFilter(query_filter, fil)
+    
     # item condition filter
     if 'conditionFilter' in query_filter and query_filter['conditionFilter'] != '':
         sanitizeString(query_filter['conditionFilter'])
         fil['$and'].append({'condition': query_filter['conditionFilter']})
-        
+    
     # admin filter
     if 'adminFilter' in query_filter and len(query_filter['adminFilter']) > 0:
         adf = { '$or': [] }
@@ -125,7 +127,7 @@ def unpackInstockFilter(query_filter, fil):
             n = sanitizeString(name)
             adf['$or'].append({ 'adminName': n })
         fil['$and'].append(adf)
-            
+    
     # keyword filter on lead and description
     if 'keywordFilter' in query_filter and len(query_filter['keywordFilter']) > 0:
         kwFilter = { '$or': [] }

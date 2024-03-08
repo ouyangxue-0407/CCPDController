@@ -1,7 +1,9 @@
+from ctypes import Array
 from django.db import models
 import os
 from typing import Any
 from jsonfield import JSONField
+from numpy import tile
 
 CONDITION_CHOISES = [
     ('New', 'New'),
@@ -66,7 +68,7 @@ class InventoryItem(models.Model):
     def __str__(self) -> str:
         return str(self.sku)
     
-class InstockInventory(models.Model): 
+class InstockInventory(models.Model):
     sku = models.IntegerField()
     time = models.CharField(max_length=30)
     shelfLocation = models.CharField(max_length=4)
@@ -103,3 +105,51 @@ class InstockInventory(models.Model):
     # return inventory sku
     def __str__(self) -> str:
         return str(self.sku)
+    
+    
+class AuctionRecord(models.Model): 
+    lot: int = models.IntegerField()
+    totalItems: int = models.IntegerField()
+    openTime: str = models.CharField(max_length=30)
+    closeTime: str = models.CharField(max_length=30)
+    closed: bool = models.BooleanField()
+    title: str = models.CharField()
+    description: str = models.CharField()
+    minMSRP: str = models.IntegerField()
+    maxMSRP: str = models.IntegerField()
+    remainingResolved: str = models.BooleanField()
+
+# export type AuctionInfo = {
+#   lot: number,
+#   totalItems: number,
+#   openTime: string,
+#   closeTime: string,
+#   closed: boolean,
+#   itemsArr: InstockItem[],
+#   title?: string,
+#   description?: string,
+#   minMSRP?: number,
+#   maxMSRP?: number,
+#   remainingResolved?: boolean,
+#   inventorySpan?: {
+#     gt: string,
+#     lt: string
+#   }
+# }
+
+
+    def __init__(self, lot, totalItems, openTime, closeTime, closed, title, description, minMSRP, maxMSRP, remainingResolved) -> None:
+        self.lot = lot
+        self.totalItems = totalItems
+        self.openTime = openTime
+        self.closeTime = closeTime
+        self.closed = closed
+        self.title = tile
+        self.description = description
+        self.minMSRP = minMSRP
+        self.maxMSRP = maxMSRP
+        self.remainingResolved = remainingResolved
+            
+    # return inventory sku
+    def __str__(self) -> str:
+        return str(self.lot)
