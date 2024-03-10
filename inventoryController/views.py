@@ -1,12 +1,14 @@
+from math import inf
 import os
+from turtle import title
 from urllib import response
 from uu import decode
-from django.http import HttpRequest, HttpResponse
-from numpy import NaN
+from django.http import HttpRequest
+from numpy import NaN, tile
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
-from inventoryController.models import InstockInventory, InventoryItem
+from inventoryController.models import AuctionRecord, InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import (
     convertToAmountPerDayData, decodeJSON, 
@@ -45,6 +47,8 @@ db = get_db_client()
 qa_collection = db[qa_inventory_db_name]
 instock_collection = db['InstockInventory']
 user_collection = db['User']
+auction_collection = db['AuctionHistory']
+remaining_collection = db['RemainingHistory']
 ua = UserAgent()
 
 
@@ -633,13 +637,44 @@ def createInstockInventory(request: HttpRequest):
     
     return Response('Inventory Created', status.HTTP_200_OK)
 
+
+# get all filtered instock inventory with no lead or description
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def getAbnormalInstockInventory(request: HttpRequest):
+    # try:
+    body = decodeJSON(request.body)
+    fil = {}
+    unpackInstockFilter(body['filter'], fil)
+    fil['$and'].append({'or': [{'lead': ''}, {'description': ''}]})
+    # except:
+    #     return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    res = instock_collection.find(fil, {'_id': 0})
+    arr = []
+    for item in res:
+        arr.append(item)
+    return Response([], status.HTTP_200_OK)
+
+'''
+Auction Stuff
+'''
 # generate instock inventory csv file competible with hibid
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def getInstockCsv(request: HttpRequest):
-    body = decodeJSON(request.body)
+def getAuctionCsv(request: HttpRequest):
+    try:
+        body = decodeJSON(request.body)
+        lot = sanitizeNumber(body['lot'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
 
+    record = auction_collection.find_one({'lot': lot}, {'_id': 0})
+    if not record:
+        return Response('Auction Record Not Found', status.HTTP_404_NOT_FOUND)
+    
     # append this in front of description for item msrp lte 80$
     desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
     vendor_name = 'B0000'
@@ -648,90 +683,223 @@ def getInstockCsv(request: HttpRequest):
     aliexpress_mystery_box_closing = 25
     reserve_default = 0
     
-    # for images data frame
-    maxImageCount = 15
-    ImageDataExample = [
-        ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
-        ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
-    ]
+    # process the top row array
+    topRow = []
+    topRowArr = body['topRow']
+    for item in topRowArr:
+        if 'msrp' in item:
+            msrp = float(sanitizeNumber(item['msrp']))
+        else:
+            msrp = ''
+        if 'description' in item:
+            if msrp != '' and msrp < 80:
+                desc = desc_under_80 + ' '+ sanitizeString(item['description'])
+            else:
+                desc = sanitizeString(item['description'])
+        else: 
+            desc = ''
+        if 'lead' in item:
+            lead = sanitizeString(item['lead'])
+        else:
+            lead = ''
+        if 'startBid' in item:
+            startBid = sanitizeNumber(item['startBid'])
+        else:
+            startBid = ''
+        if 'reserve' in item:
+            reserve = sanitizeNumber(item['reserve'])
+        else:
+            reserve = ''
     
-    max_length = max(len(row) for row in ImageDataExample)
-    normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
-    image_df = pd.DataFrame(normalized_data)
+        row = {
+            'Lot': sanitizeNumber(item['lot']), 
+            'Lead': lead,
+            'Description': desc,
+            'MSRP:$': 'MSRP:$',
+            'Price': msrp,
+            'Location': sanitizeString(item['shelfLocation']),
+            'item': sanitizeNumber(item['sku']),
+            'vendor': vendor_name,
+            'start bid': startBid,
+            'reserve': reserve,
+            'Est': msrp,
+        }
+        topRow.append(row)
+    
+    
+    # make inventory csv rows
+    data = []
+    itemsArr = record['itemsArr']
+    for item in itemsArr:
+        # get float msrp
+        if 'msrp' in item:
+            msrp = float(sanitizeNumber(item['msrp']))
+        else:
+            msrp = ''
+            
+        # description adjusted according to msrp
+        if 'description' in item:
+            # desc_under_80 + ' '+ desc if msrp < 80 else desc
+            if msrp != '' and msrp < 80:
+                desc = desc_under_80 + ' '+ sanitizeString(item['description'])
+            else:
+                desc = sanitizeString(item['description'])
+        else: 
+            desc = ''
+        
+        # get title
+        if 'lead' in item:
+            lead = sanitizeString(item['lead'])
+        else:
+            lead = ''
+            
+        row = {
+            'Lot': sanitizeNumber(item['lot']), 
+            'Lead': lead,
+            'Description': desc,
+            'MSRP:$': 'MSRP:$',
+            'Price': msrp,
+            'Location': sanitizeString(item['shelfLocation']),
+            'item': sanitizeNumber(item['sku']),
+            'vendor': vendor_name,
+            'start bid': default_start_bid,
+            'reserve': reserve_default,
+            'Est': msrp,
+        }
+        data.append(row)
 
-    col = [
-        'Lot',
-        'Lead',        # original lead from recording
-        'Description', # original description from recording
-        'MSRP:$',      
-        'Price',       # original scraped msrp  
-        'Location',    # original shelfLocation
-        'item',
-        'vendor',     
-        'start bid',
-        'reserve',
-        'Est',
-    ]
     
-    example = {
-        'Lot': 706, 
-        'Lead': 'xxx',
-        'Description': 'xxxx',
-        'MSRP:$': 'MSRP:$',
-        'Price': 'NA',
-        'Location': 'D11',
-        'item': '99999',
-        'vendor': vendor_name,
-        'start bid': 5,
-        'reserve': 0,
-        'Est': 0,
-    }
-    example2 = {
-        'Lot': 707, 
-        'Lead': 'xxx',
-        'Description': 'xxxx',
-        'MSRP:$': 'MSRP:$',
-        'Price': 'NA',
-        'Location': 'D11',
-        'item': '99998',
-        'vendor': vendor_name,
-        'start bid': 5,
-        'reserve': 0,
-        'Est': 0,
-    }
-    data = [example, example2]
+    # # for images data frame
+    # # maxImageCount = 15
+    # ImageDataExample = [
+    #     ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
+    #     ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
+    # ]
+    
+    # max_length = max(len(row) for row in ImageDataExample)
+    # normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
+    # image_df = pd.DataFrame(normalized_data)
+
+    # construct data frame and convert it into csv
     df = pd.DataFrame(
-        data=data,
-        columns=col
+        data=(topRow + data),
+        columns=[
+            'Lot',
+            'Lead',        # original lead from recording
+            'Description', # original description from recording
+            'MSRP:$',      
+            'Price',       # original scraped msrp  
+            'Location',    # original shelfLocation
+            'item',
+            'vendor',     
+            'start bid',
+            'reserve',
+            'Est',
+        ]
     )
-    res = df.join(image_df, how='outer')
-    csv = res.to_csv(index=False)
+    # outer joins the image part of csv
+    # res = df.join(image_df, how='outer')
+    csv = df.to_csv(index=False)
     response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
     return response
 
-
-'''
-Auction Stuff
-'''
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def createAuctionRecord(request: HttpRequest):
-    body = decodeJSON(request.body)
+def getAuctionRemainingRecord(request: HttpRequest):
+    # get everything
+    # TODO: make it paged
+    res = auction_collection.find({}, {'_id': 0})
+    auctions = []
+    for item in res:
+        auctions.append(item)
+    res = remaining_collection.find({}, {'_id': 0})
+    remaining = []
+    for item in res:
+        remaining.append(item)
+    return Response({'auctions': auctions, 'remaining': remaining}, status.HTTP_200_OK)
 
-    
-
-    return Response('suc', status.HTTP_200_OK)
-
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def addItemstoAuctionRecord(request: HttpRequest):
+    return Response('', status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def createAuctionRecord(request: HttpRequest):
     body = decodeJSON(request.body)
+    lot = sanitizeNumber(body['lot'])
+    exist = auction_collection.find_one({'lot': lot})
+    if exist:
+        return Response('Lot Exist', status.HTTP_409_CONFLICT)
+    itemLotStart = sanitizeNumber(body['itemLotStart'])
     
-    return Response('', status.HTTP_200_OK)
+    # construct auction record fields
+    endDate = sanitizeString(body['endDate'])
+    title = ''
+    description = ''
+    minMSRP = 0
+    maxMSRP = 0
+    minSku = 0
+    maxSku = 0
+    
+    if 'title' in body:
+        title = sanitizeString(body['title'])
+    if 'description' in body:
+        description = sanitizeString(body['description'])
+    if 'filter' in body:
+        if 'minMSRP' in body['filter']:
+            minMSRP = sanitizeNumber(body['filter']['minMSRP'])
+        if 'maxMSRP' in body['filter']:
+            maxMSRP = sanitizeNumber(body['filter']['maxMSRP'])
+        if 'sku' in body['filter']:
+            if 'gte' in body['filter']['sku'] and body['filter']['sku']['gte'] != '':
+                minSku = sanitizeNumber(int(body['filter']['sku']['gte']))
+            if 'lte' in body['filter']['sku'] and body['filter']['sku']['lte'] != '':
+                maxSku = sanitizeNumber(int(body['filter']['sku']['lte']))
+        fil = {}
+        unpackInstockFilter(body['filter'], fil)
+    
+    itemsArr = []
+    res = instock_collection.find(fil, {'_id': 0, 'sku': 1, 'lead': 1, 'msrp': 1, 'description': 1, 'shelfLocation': 1})
+    count = instock_collection.count_documents(fil)
+    for item in res:
+        itemsArr.append(item)
+    
+    # append item lot number inside
+    itemLotNumbersArr = []
+    for x in range(itemLotStart, itemLotStart + count + 1):
+        itemLotNumbersArr.append({'lot': x})
+    merged_list = [{**d1, **d2} for d1, d2 in zip(itemLotNumbersArr, itemsArr)]
+    
+    print(f'lot: {lot}')
+    print(f'fil: {fil}')
+    print(f'count: {count}')
+
+    auctionRecord = AuctionRecord(
+        lot=lot,
+        totalItems=count,
+        openTime=getIsoFormatNow(),
+        closeTime=endDate,
+        closed=False,
+        title=title,
+        description=description,
+        minMSRP=minMSRP,
+        maxMSRP=maxMSRP,
+        remainingResolved=False,
+        minSku=minSku,
+        maxSku=maxSku,
+    )
+    try: 
+        res = auction_collection.insert_one({**auctionRecord.__dict__, 'itemsArr': merged_list})
+        if not res:
+            return Response('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except: 
+        print('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(f'Auction Record {lot} Created', status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -899,7 +1067,6 @@ def sendInstockCSV(request: HttpRequest):
     # joint file location with relative path
     dirName = os.path.dirname(__file__)
     fileName = os.path.join(dirName, path)
-    print(getIsoFormatNow())
     
     # parse csv to pandas data frame
     data = pd.read_csv(filepath_or_buffer=fileName)

@@ -3,6 +3,7 @@ from . import views
 
 # define all routes
 urlpatterns = [
+    # QA inventory
     path("getInventoryBySku", views.getInventoryBySku, name="getInventoryBySku"),
     path("createInventory", views.createInventory, name="createInventory"),
     path("deleteInventoryBySku", views.deleteInventoryBySku, name="deleteInventoryBySku"), 
@@ -22,7 +23,12 @@ urlpatterns = [
     path("createInstockInventory", views.createInstockInventory, name="createInstockInventory"),
     path("updateInstockBySku", views.updateInstockBySku, name="updateInstockBySku"),
     path("deleteInstockBySku", views.deleteInstockBySku, name="deleteInstockBySku"),
-    path("getInstockCsv", views.getInstockCsv, name="getInstockCsv"),
+    path("getAuctionCsv", views.getAuctionCsv, name="getAuctionCsv"),
+    path("getAbnormalInstockInventory", views.getAbnormalInstockInventory, name="getAbnormalInstockInventory"),
+    # auction function
+    path("getAuctionRemainingRecord", views.getAuctionRemainingRecord, name="getAuctionRemainingRecord"),
+    path("createAuctionRecord", views.createAuctionRecord, name="createAuctionRecord"),
+    path("processRemaining", views.processRemaining, name="processRemaining"),
     # scraping function
     path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
     path("scrapeInfoBySkuAmazon", views.scrapeInfoBySkuAmazon, name="scrapeInfoBySkuAmazon"),

@@ -113,42 +113,30 @@ class AuctionRecord(models.Model):
     openTime: str = models.CharField(max_length=30)
     closeTime: str = models.CharField(max_length=30)
     closed: bool = models.BooleanField()
-    title: str = models.CharField()
-    description: str = models.CharField()
-    minMSRP: str = models.IntegerField()
-    maxMSRP: str = models.IntegerField()
+    title: str = models.CharField(max_length=100)
+    description: str = models.CharField(max_length=300)
+    minMSRP: float = models.FloatField()
+    maxMSRP: float = models.FloatField()
     remainingResolved: str = models.BooleanField()
+    minSku: int = models.IntegerField()
+    maxSku: int = models.IntegerField()
 
-# export type AuctionInfo = {
-#   lot: number,
-#   totalItems: number,
-#   openTime: string,
-#   closeTime: string,
-#   closed: boolean,
-#   itemsArr: InstockItem[],
-#   title?: string,
-#   description?: string,
-#   minMSRP?: number,
-#   maxMSRP?: number,
-#   remainingResolved?: boolean,
-#   inventorySpan?: {
-#     gt: string,
-#     lt: string
-#   }
-# }
+    # excluded:
+    # itemsArr: InstockItem[],
 
-
-    def __init__(self, lot, totalItems, openTime, closeTime, closed, title, description, minMSRP, maxMSRP, remainingResolved) -> None:
+    def __init__(self, lot, totalItems, openTime, closeTime, closed, title, description, minMSRP, maxMSRP, remainingResolved, minSku, maxSku) -> None:
         self.lot = lot
         self.totalItems = totalItems
         self.openTime = openTime
         self.closeTime = closeTime
         self.closed = closed
-        self.title = tile
+        self.title = title
         self.description = description
         self.minMSRP = minMSRP
         self.maxMSRP = maxMSRP
         self.remainingResolved = remainingResolved
+        self.minSku = minSku
+        self.maxSku = maxSku
             
     # return inventory sku
     def __str__(self) -> str:
