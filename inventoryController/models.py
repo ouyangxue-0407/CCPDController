@@ -1,4 +1,5 @@
 from ctypes import Array
+from shelve import Shelf
 from django.db import models
 import os
 from typing import Any
@@ -106,7 +107,27 @@ class InstockInventory(models.Model):
     def __str__(self) -> str:
         return str(self.sku)
     
+   
+class AuctionItem(models.Model):
+    lot = models.IntegerField # item lot number inside auction
+    lead = models.CharField(max_length=100)
+    description = models.CharField(max_length=300)
+    msrp = models.IntegerField()
+    shelfLocation = models.CharField(max_length=6)
+    sku = models.IntegerField()
+
+    def __init__(self, lot, lead, description, msrp, shelfLocation, sku) -> None:
+        self.lot = lot
+        self.lead = lead
+        self.description = description
+        self.msrp = msrp
+        self.shelfLocation = shelfLocation
+        self.sku = sku
     
+    # return inventory sku
+    def __str__(self) -> str:
+        return str(self.sku)
+
 class AuctionRecord(models.Model): 
     lot: int = models.IntegerField()
     totalItems: int = models.IntegerField()
@@ -123,6 +144,7 @@ class AuctionRecord(models.Model):
 
     # excluded:
     # itemsArr: InstockItem[],
+    # topRow: InstockItem[],
 
     def __init__(self, lot, totalItems, openTime, closeTime, closed, title, description, minMSRP, maxMSRP, remainingResolved, minSku, maxSku) -> None:
         self.lot = lot

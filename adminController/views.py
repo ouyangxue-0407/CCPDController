@@ -332,12 +332,12 @@ def getQARecordsByPage(request):
         return Response('Cannot Fetch From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response({"arr": arr, "count": count}, status.HTTP_200_OK)
 
-@api_view(['POST'])
+@api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def deleteQARecordsBySku(request, sku): 
     try:
-        sanitizeNumber(int(sku))
+        sku = sanitizeNumber(int(sku))
     except:
         return Response('Invalid SKU', status.HTTP_400_BAD_REQUEST)
     

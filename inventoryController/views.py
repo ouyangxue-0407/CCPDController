@@ -1,5 +1,6 @@
 from math import inf
 import os
+from re import L
 from turtle import title
 from urllib import response
 from uu import decode
@@ -8,7 +9,7 @@ from numpy import NaN, tile
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
-from inventoryController.models import AuctionRecord, InstockInventory, InventoryItem
+from inventoryController.models import AuctionItem, AuctionRecord, InstockInventory, InventoryItem
 from CCPDController.scrape_utils import extract_urls, getCurrency, getImageUrl, getMsrp, getTitle
 from CCPDController.utils import (
     convertToAmountPerDayData, decodeJSON, 
@@ -685,7 +686,7 @@ def getAuctionCsv(request: HttpRequest):
     
     # process the top row array
     topRow = []
-    topRowArr = body['topRow']
+    topRowArr = record['topRow']
     for item in topRowArr:
         if 'msrp' in item:
             msrp = float(sanitizeNumber(item['msrp']))
@@ -820,11 +821,63 @@ def getAuctionRemainingRecord(request: HttpRequest):
         remaining.append(item)
     return Response({'auctions': auctions, 'remaining': remaining}, status.HTTP_200_OK)
 
-@api_view(['GET'])
+@api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
-def addItemstoAuctionRecord(request: HttpRequest):
+def addTopRowItem(request: HttpRequest):
+    try:
+        body = decodeJSON(request.body)
+        auctionLot = sanitizeNumber(body['auctionLot'])
+        item = body['newItem']
+        
+        # pass through the model
+        newTopRowItem = AuctionItem(
+            lot=sanitizeNumber(item['lot']),
+            sku=sanitizeNumber(item['sku']),
+            lead=sanitizeString(item['lead']),
+            description=sanitizeString(item['description']),
+            msrp=sanitizeNumber(item['msrp']),
+            shelfLocation=sanitizeString(item['shelfLocation']),
+        )
+    except Exception as e:
+        return Response(e, status.HTTP_400_BAD_REQUEST)
+
+
+    res = auction_collection.update_one(
+        { 'lot': auctionLot },
+        {
+            '$push': {
+                'topRow': newTopRowItem.__dict__
+            }
+        }
+    )
+    if not res:
+        return Response('Cannot Insert')
     return Response('', status.HTTP_200_OK)
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def deleteTopRowItem(request: HttpRequest):
+    try:
+        body = decodeJSON(request)
+        sku = sanitizeNumber(body['sku'])
+        itemLotNum = sanitizeNumber(body['itemLotNumber'])
+        auctionLotNum = sanitizeNumber(body['auctionLotNumber'])
+    except Exception as e:
+        return Response(e, status.HTTP_400_BAD_REQUEST)
+    
+    res = auction_collection.update_one(
+        { 
+            'lot':  auctionLotNum,
+            'topRow': {'$elemMatch': { 'sku': sku, 'lot': itemLotNum }}
+        },
+        { '$pull': { 'topRow': { 'sku': sku, 'lot': itemLotNum }}}
+    )
+
+    if not res:
+        return Response('Cannot Delete Item', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response('Item Deleted', status.HTTP_200_OK)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -915,6 +968,20 @@ def processRemaining(request: HttpRequest):
     #     return Response({'message': 'CSV file processed successfully'})
     # return Response({'error': 'No file was uploaded'}, status=400)
     # return Response('', status.HTTP_200_OK)
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def deleteAuctionRecord(request: HttpRequest):
+    try:
+        body = decodeJSON(request.body)
+        lot = sanitizeNumber(body['lot'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    res = auction_collection.delete_one({'lot': lot})
+    if not res:
+        return Response('Cannot Delete From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 '''
@@ -1067,7 +1134,6 @@ def sendInstockCSV(request: HttpRequest):
     # joint file location with relative path
     dirName = os.path.dirname(__file__)
     fileName = os.path.join(dirName, path)
-    
     # parse csv to pandas data frame
     data = pd.read_csv(filepath_or_buffer=fileName)
     
