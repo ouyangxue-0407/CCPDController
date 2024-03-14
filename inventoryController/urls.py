@@ -32,6 +32,7 @@ urlpatterns = [
     path("addTopRowItem", views.addTopRowItem, name="addTopRowItem"),
     path("deleteTopRowItem", views.deleteTopRowItem, name="deleteTopRowItem"),
     path("deleteAuctionRecord", views.deleteAuctionRecord, name="deleteAuctionRecord"),
+    path("deleteRemainingRecord", views.deleteRemainingRecord, name="deleteRemainingRecord"),
     # scraping function
     path("generateDescriptionBySku", views.generateDescriptionBySku, name="generateDescriptionBySku"),
     path("scrapeInfoBySkuAmazon", views.scrapeInfoBySkuAmazon, name="scrapeInfoBySkuAmazon"),

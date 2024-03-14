@@ -260,3 +260,40 @@ def getTodayTimeRangeFil(deltaDays=0):
         '$gte': time.replace(hour=0, minute=0, second=0, microsecond=0).strftime(full_iso_format),
         '$lt': time.replace(hour=23, minute=59, second=59, microsecond=999999).strftime(full_iso_format)
     }
+
+def findObjectInArray(array_of_objects, key, value):
+    return [obj for obj in array_of_objects if obj.get(key) == value][0]
+
+default_start_bid = 5
+low_value_start_bid = 2
+reserve_default = 0
+# generate reserve price according to description and condition
+# Arthur: @ouyangxue-0407
+def process_numbers(number,factor):
+    multiplied = number * factor
+    rounded = round(multiplied / 5) * 5
+    return rounded
+def getBidReserve(description, msrp, condition):
+    price = round(float(sanitizeNumber(msrp)), 2)
+    reserve = reserve_default
+    startbid = default_start_bid
+    
+    # determine reserve price
+    if price > 79.99:
+        match condition:
+            case "Sealed":
+                reserve = process_numbers(price, 0.375)
+            case "New":
+                if "MISSING PART" in description.upper():
+                    reserve = process_numbers(price, 0.30)
+                else:
+                    reserve = process_numbers(price, 0.35)
+            case "Used Like New":
+                reserve = process_numbers(price, 0.30)
+            case "Used":
+                reserve = process_numbers(price, 0.25)
+    
+    # determine start bid
+    if price < 11:
+        startbid = low_value_start_bid
+    return {'startBid': startbid, 'reserve': reserve}

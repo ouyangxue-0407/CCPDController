@@ -1,11 +1,10 @@
-from math import inf
+import csv
+from ctypes import Array
 import os
-from re import L
-from turtle import title
 from urllib import response
 from uu import decode
 from django.http import HttpRequest
-from numpy import NaN, tile
+from numpy import NaN
 import requests
 from scrapy.http import HtmlResponse
 from datetime import datetime, timedelta
@@ -25,13 +24,14 @@ from CCPDController.utils import (
     getIsoFormatNow, 
     sanitizeString,
     full_iso_format,
+    findObjectInArray,
+    getBidReserve,
     inv_iso_format
 )
 from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
 from CCPDController.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
-from rest_framework.request import Request
 from rest_framework import status
 from fake_useragent import UserAgent
 from bson.objectid import ObjectId
@@ -42,6 +42,15 @@ import pymongo
 import pandas as pd
 from bs4 import BeautifulSoup
 from io import TextIOWrapper
+
+
+# append this in front of description for item msrp lte 80$
+desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
+vendor_name = 'B0000'
+default_start_bid = 5
+default_start_bid_mystery_box = 5
+aliexpress_mystery_box_closing = 25
+reserve_default = 0
 
 # pymongo
 db = get_db_client()
@@ -638,7 +647,6 @@ def createInstockInventory(request: HttpRequest):
     
     return Response('Inventory Created', status.HTTP_200_OK)
 
-
 # get all filtered instock inventory with no lead or description
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
@@ -676,60 +684,53 @@ def getAuctionCsv(request: HttpRequest):
     if not record:
         return Response('Auction Record Not Found', status.HTTP_404_NOT_FOUND)
     
-    # append this in front of description for item msrp lte 80$
-    desc_under_80 = 'READ NEW TERMS OF USE BEFORE YOU BID!'
-    vendor_name = 'B0000'
-    default_start_bid = 5
-    default_start_bid_mystery_box = 5
-    aliexpress_mystery_box_closing = 25
-    reserve_default = 0
-    
     # process the top row array
     topRow = []
-    topRowArr = record['topRow']
-    for item in topRowArr:
-        if 'msrp' in item:
-            msrp = float(sanitizeNumber(item['msrp']))
-        else:
-            msrp = ''
-        if 'description' in item:
-            if msrp != '' and msrp < 80:
-                desc = desc_under_80 + ' '+ sanitizeString(item['description'])
+    if 'topRow' in record:
+        topRowArr = record['topRow']
+        for item in topRowArr:
+            if 'msrp' in item:
+                msrp = float(sanitizeNumber(item['msrp']))
             else:
-                desc = sanitizeString(item['description'])
-        else: 
-            desc = ''
-        if 'lead' in item:
-            lead = sanitizeString(item['lead'])
-        else:
-            lead = ''
-        if 'startBid' in item:
-            startBid = sanitizeNumber(item['startBid'])
-        else:
-            startBid = ''
-        if 'reserve' in item:
-            reserve = sanitizeNumber(item['reserve'])
-        else:
-            reserve = ''
-    
-        row = {
-            'Lot': sanitizeNumber(item['lot']), 
-            'Lead': lead,
-            'Description': desc,
-            'MSRP:$': 'MSRP:$',
-            'Price': msrp,
-            'Location': sanitizeString(item['shelfLocation']),
-            'item': sanitizeNumber(item['sku']),
-            'vendor': vendor_name,
-            'start bid': startBid,
-            'reserve': reserve,
-            'Est': msrp,
-        }
-        topRow.append(row)
-    
+                msrp = ''
+            if 'description' in item:
+                if msrp != '' and msrp < 80:
+                    desc = desc_under_80 + ' '+ sanitizeString(item['description'])
+                else:
+                    desc = sanitizeString(item['description'])
+            else: 
+                desc = ''
+            if 'lead' in item:
+                lead = sanitizeString(item['lead'])
+            else:
+                lead = ''
+            if 'startBid' in item:
+                startBid = sanitizeNumber(item['startBid'])
+            else:
+                startBid = ''
+            if 'reserve' in item:
+                reserve = sanitizeNumber(item['reserve'])
+            else:
+                reserve = ''
+        
+            row = {
+                'Lot': sanitizeNumber(item['lot']), 
+                'Lead': lead,
+                'Description': desc,
+                'MSRP:$': 'MSRP:$',
+                'Price': msrp,
+                'Location': sanitizeString(item['shelfLocation']),
+                'item': sanitizeNumber(item['sku']),
+                'vendor': vendor_name,
+                'start bid': startBid,
+                'reserve': reserve,
+                'Est': msrp,
+            }
+            topRow.append(row)
+        
     
     # make inventory csv rows
-    data = []
+    itemsArrData = []
     itemsArr = record['itemsArr']
     for item in itemsArr:
         # get float msrp
@@ -740,7 +741,6 @@ def getAuctionCsv(request: HttpRequest):
             
         # description adjusted according to msrp
         if 'description' in item:
-            # desc_under_80 + ' '+ desc if msrp < 80 else desc
             if msrp != '' and msrp < 80:
                 desc = desc_under_80 + ' '+ sanitizeString(item['description'])
             else:
@@ -767,23 +767,23 @@ def getAuctionCsv(request: HttpRequest):
             'reserve': reserve_default,
             'Est': msrp,
         }
-        data.append(row)
+        itemsArrData.append(row)
 
     
     # # for images data frame
-    # # maxImageCount = 15
-    # ImageDataExample = [
-    #     ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
-    #     ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
-    # ]
+    ImageDataExample = [
+        ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
+        ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
+    ]
     
-    # max_length = max(len(row) for row in ImageDataExample)
-    # normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
-    # image_df = pd.DataFrame(normalized_data)
+    max_length = max(len(row) for row in ImageDataExample)
+    normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
+    # join this with inventory df to get csv
+    image_df = pd.DataFrame(normalized_data)
 
     # construct data frame and convert it into csv
     df = pd.DataFrame(
-        data=(topRow + data),
+        data=(topRow + itemsArrData),
         columns=[
             'Lot',
             'Lead',        # original lead from recording
@@ -860,7 +860,7 @@ def addTopRowItem(request: HttpRequest):
 @permission_classes([IsAdminPermission])
 def deleteTopRowItem(request: HttpRequest):
     try:
-        body = decodeJSON(request)
+        body = decodeJSON(request.body)
         sku = sanitizeNumber(body['sku'])
         itemLotNum = sanitizeNumber(body['itemLotNumber'])
         auctionLotNum = sanitizeNumber(body['auctionLotNumber'])
@@ -868,11 +868,13 @@ def deleteTopRowItem(request: HttpRequest):
         return Response(e, status.HTTP_400_BAD_REQUEST)
     
     res = auction_collection.update_one(
-        { 
+        {
             'lot':  auctionLotNum,
-            'topRow': {'$elemMatch': { 'sku': sku, 'lot': itemLotNum }}
+            'topRow': { '$elemMatch': { 'sku': sku, 'lot': itemLotNum }}
         },
-        { '$pull': { 'topRow': { 'sku': sku, 'lot': itemLotNum }}}
+        {
+            '$pull': { 'topRow': { 'sku': sku, 'lot': itemLotNum }}
+        }
     )
 
     if not res:
@@ -899,6 +901,7 @@ def createAuctionRecord(request: HttpRequest):
     minSku = 0
     maxSku = 0
     
+    # unpack body 
     if 'title' in body:
         title = sanitizeString(body['title'])
     if 'description' in body:
@@ -916,22 +919,29 @@ def createAuctionRecord(request: HttpRequest):
         fil = {}
         unpackInstockFilter(body['filter'], fil)
     
+    # construct itemsArr inside auction record
     itemsArr = []
-    res = instock_collection.find(fil, {'_id': 0, 'sku': 1, 'lead': 1, 'msrp': 1, 'description': 1, 'shelfLocation': 1})
+    res = instock_collection.find(fil, { '_id': 0, 'sku': 1, 'lead': 1, 'msrp': 1, 'description': 1, 'shelfLocation': 1, 'condition': 1 }).sort({ 'msrp': -1 })
     count = instock_collection.count_documents(fil)
     for item in res:
-        itemsArr.append(item)
-    
+        priceObj = getBidReserve(
+            item['description'] if 'description' in item else '', 
+            item['msrp'] if 'msrp' in item else 0, 
+            item['condition'] if 'condition' in item else 'New'
+        )
+        itemsArr.append({
+            **item, 
+            'startBid': priceObj['startBid'], 
+            'reserve': priceObj['reserve'],
+        }) # start bid and reserve is calculated at getBidReserveEst
+
     # append item lot number inside
     itemLotNumbersArr = []
     for x in range(itemLotStart, itemLotStart + count + 1):
         itemLotNumbersArr.append({'lot': x})
     merged_list = [{**d1, **d2} for d1, d2 in zip(itemLotNumbersArr, itemsArr)]
-    
-    print(f'lot: {lot}')
-    print(f'fil: {fil}')
-    print(f'count: {count}')
 
+    # path through model
     auctionRecord = AuctionRecord(
         lot=lot,
         totalItems=count,
@@ -947,6 +957,7 @@ def createAuctionRecord(request: HttpRequest):
         maxSku=maxSku,
     )
     try: 
+        # create auction record in mongo db
         res = auction_collection.insert_one({**auctionRecord.__dict__, 'itemsArr': merged_list})
         if not res:
             return Response('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -954,20 +965,104 @@ def createAuctionRecord(request: HttpRequest):
         print('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(f'Auction Record {lot} Created', status.HTTP_200_OK)
 
+# default remaining sheet is XLS
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def processRemaining(request: HttpRequest):
-    body = decodeJSON(request.body)
-    # if 'file' in request.FILES:
-    #     csv_file = TextIOWrapper(request.FILES['file'].file, encoding='utf-8')
-    #     csv_reader = csv.reader(csv_file)
-    #     for row in csv_reader:
-    #         # Process each row here
-    #         print(row)
-    #     return Response({'message': 'CSV file processed successfully'})
-    # return Response({'error': 'No file was uploaded'}, status=400)
-    # return Response('', status.HTTP_200_OK)
+    try:
+        # destruct from formData
+        lot_number = sanitizeNumber(int(request.data.get('lot')))
+        res = remaining_collection.find_one({'lot': lot_number})
+        if res:
+            return Response('Remaining Record Existed', status.HTTP_409_CONFLICT)
+        
+        # get itemArr in auction record
+        targetAuctionItemsArr = auction_collection.find_one({'lot': lot_number})['itemsArr']
+        if not targetAuctionItemsArr:
+            return Response(f'Auction {lot_number} Not Found', status.HTTP_404_NOT_FOUND)
+        
+        # get xls file from request (hibid default exports xls)
+        xls = request.FILES.get('xls')
+        if not xls: 
+            return Response('No File Uploaded', status.HTTP_400_BAD_REQUEST)
+        
+        # convert it into pandas dataframe
+        df = pd.DataFrame(pd.read_excel(xls))
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    # grab all neccesary columns from remaining xls (df)
+    soldItems = []
+    unsoldItems = []
+    for index, row in df.iterrows():
+        row = row.to_dict()
+        try:
+            # lot number might not be int, could be '1a' '1f' 'ff'
+            lot = sanitizeNumber(int(row.get('clotnum')))
+            # find item in matching auction record
+            item = findObjectInArray(targetAuctionItemsArr, 'lot', lot)
+        except:
+            # item not found or lot number not integer
+            continue
+        
+        # TODO: Add bid amount to retail manager as sells record 
+        # sanitize input
+        bid = sanitizeNumber(float(row.get('bidamount')))
+        sold = sanitizeString(row.get('soldstatus'))
+        lead = sanitizeString(row.get('lead'))
+        sku = sanitizeNumber(item['sku'])
+        reserve = sanitizeNumber(float(item['reserve']))
+        
+        # determin if it is sold or not
+        if sold == 'S' and bid > 0:
+            soldItem = {
+                'soldStatus': sold,
+                'bidAmount': bid,
+                'clotNumber': lot,
+                'sku': sku,
+                'lead': lead,
+                'reserve': reserve
+            }
+            soldItems.append(soldItem)
+            
+            # reduce instock amount by sold item sku
+            # res = instock_collection.update_one(
+            #     { 'sku': sku, 'quantityInstock': { '$gt': 0 }},
+            #     { '$inc': { 'quantityInstock': -1 }} 
+            # )
+            
+            # TODO: create retail record
+        elif sold == 'NS':
+            remainingItem = {
+                'lot': lot,
+                'sku': sku,
+                'lead': lead,
+                'msrp': sanitizeNumber(float(item['msrp'])),
+                'shelfLocation': sanitizeString(item['shelfLocation']),
+                'description': sanitizeString(row.get('shortdesc')),
+                'reserve': reserve,
+                'startBid': sanitizeNumber(float(item['startBid']))
+            }
+            unsoldItems.append(remainingItem)
+
+    # construct remaining info
+    RemainingInfo = {
+        'lot': lot_number,
+        'totalItems': len(soldItems) + len(unsoldItems),
+        'soldCount': len(soldItems),
+        'unsoldCount': len(unsoldItems),
+        'soldItems': soldItems,
+        'unsoldItems': unsoldItems,
+        'timeClosed': getIsoFormatNow(),
+    }
+    remaining_collection.insert_one(RemainingInfo)
+    print(unsoldItems.sort(key=lambda x: x['msrp'], reverse=True))
+    # construct csv and send to front end
+    # csv = df.to_csv(index=False)
+    # response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
+    # response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
+    return Response('Remaining Record Created', status.HTTP_200_OK)
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])
@@ -975,14 +1070,29 @@ def processRemaining(request: HttpRequest):
 def deleteAuctionRecord(request: HttpRequest):
     try:
         body = decodeJSON(request.body)
-        lot = sanitizeNumber(body['lot'])
+        auctionLotNumber = sanitizeNumber(body['auctionLotNumber'])
     except:
         return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
     
-    res = auction_collection.delete_one({'lot': lot})
+    res = auction_collection.delete_one({'lot': auctionLotNumber})
     if not res:
         return Response('Cannot Delete From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(f'Delete Auction {auctionLotNumber}', status.HTTP_200_OK)
 
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def deleteRemainingRecord(request: HttpRequest):
+    try:
+        body = decodeJSON(request.body)
+        remainingLotNumber = sanitizeNumber(body['remainingLotNumber'])
+    except:
+        return Response('Invalid Body', status.HTTP_400_BAD_REQUEST)
+    
+    res = remaining_collection.delete_one({'lot': remainingLotNumber})
+    if not res:
+        return Response('Cannot Delete From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(f'Delete Remaining Record {remainingLotNumber}', status.HTTP_200_OK)
 
 '''
 Scraping stuff 

@@ -1,10 +1,4 @@
-from ctypes import Array
-from shelve import Shelf
 from django.db import models
-import os
-from typing import Any
-from jsonfield import JSONField
-from numpy import tile
 
 CONDITION_CHOISES = [
     ('New', 'New'),
@@ -68,7 +62,7 @@ class InventoryItem(models.Model):
     # return inventory sku
     def __str__(self) -> str:
         return str(self.sku)
-    
+
 class InstockInventory(models.Model):
     sku = models.IntegerField()
     time = models.CharField(max_length=30)
@@ -106,8 +100,7 @@ class InstockInventory(models.Model):
     # return inventory sku
     def __str__(self) -> str:
         return str(self.sku)
-    
-   
+
 class AuctionItem(models.Model):
     lot = models.IntegerField # item lot number inside auction
     lead = models.CharField(max_length=100)
@@ -159,7 +152,7 @@ class AuctionRecord(models.Model):
         self.remainingResolved = remainingResolved
         self.minSku = minSku
         self.maxSku = maxSku
-            
+
     # return inventory sku
     def __str__(self) -> str:
         return str(self.lot)
