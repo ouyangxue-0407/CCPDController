@@ -3,30 +3,28 @@ import io
 import requests
 import pillow_heif
 from PIL import Image
-from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
-from CCPDController.utils import decodeJSON, getNDayBefore, sanitizeNumber, sanitizeString, getBlobTimeString, get_db_client
+from CCPDController.utils import (
+    decodeJSON, 
+    getNDayBefore, 
+    sanitizeNumber, 
+    sanitizeString, 
+    getBlobTimeString, 
+    get_db_client,
+    product_image_container_client,
+)
 from CCPDController.authentication import JWTAuthentication
 from CCPDController.permissions import IsQAPermission, IsAdminPermission
 from dotenv import load_dotenv
 from urllib import parse
-import pymongo
 load_dotenv()
 
 # Mongo DB
 db = get_db_client()
 qa_collection = db['Inventory']
-
-# Azure Blob
-account_name = 'CCPD'
-container_name = 'product-image'
-# blob client object from azure access keys
-azure_blob_client = BlobServiceClient.from_connection_string(os.getenv('SAS_KEY'))
-# container handle for product image
-product_image_container_client = azure_blob_client.get_container_client(container_name)
 
 # return array of all image url from owner
 @api_view(['POST'])

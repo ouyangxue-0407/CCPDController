@@ -1,5 +1,5 @@
 # pull the python base image
-FROM python:3.12.0-bookworm
+FROM python:3.12.2-bullseye
 
 # set work directory
 WORKDIR /usr/src/app
@@ -18,6 +18,8 @@ COPY . /usr/src/app
 
 EXPOSE 8000
 
+# dev
 CMD [ "python", "manage.py", "runserver_plus", "0.0.0.0:8000" ]
 
+# prod
 # CMD ["gunicorn", "--bind", ":8000", "--workers", "3", "CCPDController.wsgi:application"]

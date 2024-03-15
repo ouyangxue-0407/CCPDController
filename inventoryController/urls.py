@@ -29,6 +29,7 @@ urlpatterns = [
     path("getAuctionRemainingRecord", views.getAuctionRemainingRecord, name="getAuctionRemainingRecord"),
     path("createAuctionRecord", views.createAuctionRecord, name="createAuctionRecord"),
     path("processRemaining", views.processRemaining, name="processRemaining"),
+    path("updateRemainingToDB", views.updateRemainingToDB, name="updateRemainingToDB"),
     path("addTopRowItem", views.addTopRowItem, name="addTopRowItem"),
     path("deleteTopRowItem", views.deleteTopRowItem, name="deleteTopRowItem"),
     path("deleteAuctionRecord", views.deleteAuctionRecord, name="deleteAuctionRecord"),

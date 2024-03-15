@@ -26,6 +26,7 @@ from CCPDController.utils import (
     full_iso_format,
     findObjectInArray,
     getBidReserve,
+    product_image_container_client,
     inv_iso_format
 )
 from CCPDController.permissions import IsQAPermission, IsAdminPermission, IsSuperAdminPermission
@@ -435,6 +436,7 @@ def getAllShelfSheet(request: HttpRequest):
     response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
     return response
 
+
 '''
 In-stock stuff
 '''
@@ -666,6 +668,7 @@ def getAbnormalInstockInventory(request: HttpRequest):
         arr.append(item)
     return Response([], status.HTTP_200_OK)
 
+
 '''
 Auction Stuff
 '''
@@ -727,10 +730,11 @@ def getAuctionCsv(request: HttpRequest):
                 'Est': msrp,
             }
             topRow.append(row)
-        
     
     # make inventory csv rows
     itemsArrData = []
+    imageArrData = []
+    imageUrlArr = []
     itemsArr = record['itemsArr']
     for item in itemsArr:
         # get float msrp
@@ -753,54 +757,67 @@ def getAuctionCsv(request: HttpRequest):
             lead = sanitizeString(item['lead'])
         else:
             lead = ''
-            
+        
+        sku = sanitizeNumber(item['sku'])
+        itemLot = sanitizeNumber(item['lot'])
+        # create csv row
         row = {
-            'Lot': sanitizeNumber(item['lot']), 
+            'Lot': itemLot, 
             'Lead': lead,
             'Description': desc,
             'MSRP:$': 'MSRP:$',
             'Price': msrp,
             'Location': sanitizeString(item['shelfLocation']),
-            'item': sanitizeNumber(item['sku']),
+            'item': sku,
             'vendor': vendor_name,
             'start bid': default_start_bid,
             'reserve': reserve_default,
             'Est': msrp,
         }
         itemsArrData.append(row)
-
+        
+        # populate photo names array
+        sku = f"sku = '{sku}'" 
+        blob_list = product_image_container_client.find_blobs_by_tags(filter_expression=sku)
+        imageCount = sum(1 for _ in blob_list)
+        images = []
+        for x in range(imageCount):
+            name = f"{itemLot}_{x + 1}.jpg"  # image name starts with lot_1.jpg
+            images.append(name)
+        imageArrData.append(images)
     
-    # # for images data frame
-    ImageDataExample = [
-        ["706_1.jpg", "706_2.jpg", "706_3.jpg", "706_4.jpg"],
-        ["707_1.jpg", "707_2.jpg", "707_3.jpg"],
+    # column head
+    columns = [
+        'Lot',
+        'Lead',        # original lead from recording
+        'Description', # original description from recording
+        'MSRP:$',      
+        'Price',       # original scraped msrp  
+        'Location',    # original shelfLocation
+        'item',
+        'vendor',     
+        'start bid',
+        'reserve',
+        'Est',
     ]
-    
-    max_length = max(len(row) for row in ImageDataExample)
-    normalized_data = [row + [NaN] * (max_length - len(row)) for row in ImageDataExample]
-    # join this with inventory df to get csv
-    image_df = pd.DataFrame(normalized_data)
 
-    # construct data frame and convert it into csv
+    # construct data frame for top row + items 
     df = pd.DataFrame(
         data=(topRow + itemsArrData),
-        columns=[
-            'Lot',
-            'Lead',        # original lead from recording
-            'Description', # original description from recording
-            'MSRP:$',      
-            'Price',       # original scraped msrp  
-            'Location',    # original shelfLocation
-            'item',
-            'vendor',     
-            'start bid',
-            'reserve',
-            'Est',
-        ]
+        columns=columns
     )
+    
+    # create df for images
+    image_df = pd.DataFrame(imageArrData)
+    col = len(image_df.columns)
+    for x in range(col):
+        columns.append('')
+    
     # outer joins the image part of csv
-    # res = df.join(image_df, how='outer')
-    csv = df.to_csv(index=False)
+    joined_df = df.join(image_df, how='outer')
+    
+    # export csv
+    csv = joined_df.to_csv(index=False, header=columns)
     response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="shelfSheet.csv"'
     return response
@@ -811,11 +828,11 @@ def getAuctionCsv(request: HttpRequest):
 def getAuctionRemainingRecord(request: HttpRequest):
     # get everything
     # TODO: make it paged
-    res = auction_collection.find({}, {'_id': 0})
+    res = auction_collection.find({}, { '_id': 0 }).sort({ 'lot': -1 })
     auctions = []
     for item in res:
         auctions.append(item)
-    res = remaining_collection.find({}, {'_id': 0})
+    res = remaining_collection.find({}, { '_id': 0 }).sort({ 'lot': -1 })
     remaining = []
     for item in res:
         remaining.append(item)
@@ -885,6 +902,7 @@ def deleteTopRowItem(request: HttpRequest):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAdminPermission])
 def createAuctionRecord(request: HttpRequest):
+    # try:
     body = decodeJSON(request.body)
     lot = sanitizeNumber(body['lot'])
     exist = auction_collection.find_one({'lot': lot})
@@ -929,10 +947,16 @@ def createAuctionRecord(request: HttpRequest):
             item['msrp'] if 'msrp' in item else 0, 
             item['condition'] if 'condition' in item else 'New'
         )
+        if 'startBid' in item and 'reserve' in item:
+            priceObj = {
+                'reserve': sanitizeNumber(item['reserve']),
+                'startBid': sanitizeNumber(item['startBid'])
+            }
+        
         itemsArr.append({
             **item, 
-            'startBid': priceObj['startBid'], 
-            'reserve': priceObj['reserve'],
+            'startBid': priceObj['startBid'] if 'startBid' not in item else item['startBid'], 
+            'reserve': priceObj['reserve'] if 'reserve' not in item else item['reserve'],
         }) # start bid and reserve is calculated at getBidReserveEst
 
     # append item lot number inside
@@ -962,8 +986,42 @@ def createAuctionRecord(request: HttpRequest):
         if not res:
             return Response('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
     except: 
-        print('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response('Cannot Push To DB', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(f'Auction Record {lot} Created', status.HTTP_200_OK)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAdminPermission])
+def updateRemainingToDB(request: HttpRequest):
+    # try:
+    body = decodeJSON(request.body)
+    remainingLotNumber = sanitizeNumber(body['lot'])
+
+    remainingRecord = remaining_collection.find_one_and_update(
+        { 'lot': remainingLotNumber },
+        { '$set' : { 'updatedDB' : True } },
+    )
+    if not res:
+        return Response('Remaining Record Not Found', status.HTTP_200_OK)
+    # except:
+    #     return Response('Invalid Body', status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    # error array for item not instock or not found
+    errArr = []
+    soldArr = remainingRecord['soldItems']
+    for item in soldArr:
+        # reduce instock amount by sold item sku
+        res = instock_collection.update_one(
+            { 'sku': item['sku'], 'quantityInstock': { '$gt': 0 }},
+            { '$inc': { 'quantityInstock': -1 }} 
+        )
+        if not res:
+            errArr.append(item['sku'])
+    return Response({ 
+        'updatedDB': True, 
+        'errorItems': errArr, 
+        'updatedCount': len(soldArr) - len(errArr)
+    }, status.HTTP_200_OK)
 
 # default remaining sheet is XLS
 @api_view(['POST'])
@@ -1013,6 +1071,7 @@ def processRemaining(request: HttpRequest):
         lead = sanitizeString(row.get('lead'))
         sku = sanitizeNumber(item['sku'])
         reserve = sanitizeNumber(float(item['reserve']))
+        shelf = sanitizeString(item['shelfLocation'])
         
         # determin if it is sold or not
         if sold == 'S' and bid > 0:
@@ -1022,15 +1081,10 @@ def processRemaining(request: HttpRequest):
                 'clotNumber': lot,
                 'sku': sku,
                 'lead': lead,
-                'reserve': reserve
+                'reserve': reserve,
+                'shelfLocation': shelf
             }
             soldItems.append(soldItem)
-            
-            # reduce instock amount by sold item sku
-            # res = instock_collection.update_one(
-            #     { 'sku': sku, 'quantityInstock': { '$gt': 0 }},
-            #     { '$inc': { 'quantityInstock': -1 }} 
-            # )
             
             # TODO: create retail record
         elif sold == 'NS':
@@ -1039,7 +1093,7 @@ def processRemaining(request: HttpRequest):
                 'sku': sku,
                 'lead': lead,
                 'msrp': sanitizeNumber(float(item['msrp'])),
-                'shelfLocation': sanitizeString(item['shelfLocation']),
+                'shelfLocation': shelf,
                 'description': sanitizeString(row.get('shortdesc')),
                 'reserve': reserve,
                 'startBid': sanitizeNumber(float(item['startBid']))
@@ -1057,7 +1111,6 @@ def processRemaining(request: HttpRequest):
         'timeClosed': getIsoFormatNow(),
     }
     remaining_collection.insert_one(RemainingInfo)
-    print(unsoldItems.sort(key=lambda x: x['msrp'], reverse=True))
     # construct csv and send to front end
     # csv = df.to_csv(index=False)
     # response = Response(csv, status=status.HTTP_200_OK, content_type='text/csv')
@@ -1093,6 +1146,7 @@ def deleteRemainingRecord(request: HttpRequest):
     if not res:
         return Response('Cannot Delete From Database', status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(f'Delete Remaining Record {remainingLotNumber}', status.HTTP_200_OK)
+
 
 '''
 Scraping stuff 

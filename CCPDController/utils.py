@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import os
 import json
-from uu import Error
 import pytz
 from pymongo import MongoClient
 from collections import Counter
+from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -19,6 +19,14 @@ def get_db_client():
     return db_handle
 
 qa_inventory_db_name = 'QAInventory'
+
+# Azure stuff
+account_name = 'CCPD'
+container_name = 'product-image'
+# blob client object from azure access keys
+azure_blob_client = BlobServiceClient.from_connection_string(os.getenv('SAS_KEY'))
+# container handle for product image
+product_image_container_client = azure_blob_client.get_container_client(container_name)
 
 # decode body from json to object
 decodeJSON = lambda body : json.loads(body.decode('utf-8'))
