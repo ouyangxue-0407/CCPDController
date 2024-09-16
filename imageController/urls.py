@@ -3,9 +3,10 @@ from . import views
 
 # define all routes
 urlpatterns = [
-    path("downloadImage", views.downloadSingleImage, name="downloadSingleImage"),
-    path("bulkDownloadImages", views.bulkDownloadImages, name="bulkDownloadImages"), 
-    path("uploadSingleImage", views.uploadSingleImage, name="uploadSingleImage"),
-    path("bulkUploadImages", views.bulkUploadImages, name="bulkUploadImage"),
-    path("listBlobContainers", views.listBlobContainers, name="listBlobContainers")
+    path("uploadImage/<str:ownerId>/<str:owner>/<str:sku>", views.uploadImage, name="uploadImage"),
+    path("getUrlsByOwner", views.getUrlsByOwner, name="getUrlsByOwner"),
+    path("getUrlsBySku", views.getUrlsBySku, name="getUrlsBySku"),
+    path("deleteImageByName", views.deleteImageByName, name="deleteImageByName"),
+    path("uploadScrapedImage", views.uploadScrapedImage, name="uploadScrapedImage"),
+    path("rotateImage", views.rotateImage, name="rotateImage"),
 ]
